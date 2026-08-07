@@ -1,0 +1,32 @@
+{
+  "generated_at": "2026-08-07T00:00:00",
+  "project_name": "gastos",
+  "system": {
+    "os": "Windows 11 Pro",
+    "architecture": "x64"
+  },
+  "cli_tools": {
+    "git": { "installed": true, "version": "2.49.0" },
+    "gh": { "installed": false, "note": "Skipped by user choice - repo is local-only for now" },
+    "node": { "installed": true, "version": "22.15.0" },
+    "npm": { "installed": true, "version": "10.9.2" },
+    "docker": { "installed": true, "version": "28.3.2" },
+    "wsl": { "installed": true },
+    "coderabbit": { "installed": false, "note": "Skipped by user choice - manual review for now" }
+  },
+  "repository": {
+    "initialized": true,
+    "remote_url": null,
+    "branch": "master",
+    "initial_commit": "chore: initial project setup"
+  },
+  "deviations_from_standard_bootstrap": [
+    "package.json, src/, tests/ NOT created here - deferred to Story 1.1 (create-next-app) to avoid directory-conflict errors when scaffolding Next.js",
+    "GitHub repo creation skipped - user chose local-only for now",
+    "CodeRabbit setup skipped - user chose to defer"
+  ],
+  "validation": {
+    "essential_complete": true,
+    "ready_for_development": true
+  }
+}
