@@ -1,0 +1,21 @@
+# AIOS Project Configuration
+version: 2.1.0
+project:
+  name: gastos
+  type: greenfield
+  created: 2026-08-07
+
+environment:
+  bootstrapped: true
+  bootstrap_date: 2026-08-07T00:00:00
+
+workflow:
+  current: personal-project
+  phase: 0-bootstrap-complete
+
+permissions:
+  mode: ask
+
+settings:
+  auto_update_status: true
+  quality_gates_enabled: false
