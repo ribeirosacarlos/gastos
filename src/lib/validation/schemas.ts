@@ -53,3 +53,29 @@ export const purchaseSchema = z.object({
 });
 
 export type PurchaseInput = z.infer<typeof purchaseSchema>;
+
+export const fixedExpenseSchema = z.object({
+  description: z.string().min(1, "Informe a descrição"),
+  valueCents: z.coerce
+    .number()
+    .int("Valor deve ser um valor inteiro (em centavos)")
+    .positive("Valor deve ser maior que zero"),
+  currency: z.enum(supportedCurrencyCodes, {
+    message: "Moeda não suportada",
+  }),
+  startYear: z.coerce.number().int("Ano inválido"),
+  startMonth: z.coerce
+    .number()
+    .int()
+    .min(1, "Mês deve estar entre 1 e 12")
+    .max(12, "Mês deve estar entre 1 e 12"),
+  totalInstallments: z.coerce
+    .number()
+    .int("Número de parcelas deve ser inteiro")
+    .min(1, "Mínimo de 1 parcela")
+    .optional()
+    .nullable(),
+  isShared: z.coerce.boolean(),
+});
+
+export type FixedExpenseInput = z.infer<typeof fixedExpenseSchema>;
