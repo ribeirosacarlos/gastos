@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   fetchExchangeRateFromApi,
   updateExchangeRateManually,
@@ -38,6 +39,7 @@ export function CurrencyRateRow({
         setError(result.error);
         return;
       }
+      toast.success(`Taxa de ${currency} atualizada via API.`);
       router.refresh();
     });
   }
@@ -54,6 +56,7 @@ export function CurrencyRateRow({
         setError(result.error);
         return;
       }
+      toast.success(`Taxa de ${currency} salva.`);
       router.refresh();
     });
   }

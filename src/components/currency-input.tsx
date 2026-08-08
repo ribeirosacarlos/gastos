@@ -13,32 +13,56 @@ interface CurrencyInputProps {
 }
 
 function centsToInputString(cents: number): string {
-  return (cents / 100).toFixed(2);
+  return formatWithThousands((cents / 100).toFixed(2).replace(".", ","));
 }
 
-// Aceita tanto "1500,00" (BR) quanto "1500.00" (US) como separador decimal.
-// Mascara com separador de milhar automatico fica pro passo de Polish do
-// plano (nao e escopo desta story).
+// Decide onde fica o separador decimal num texto que pode ter os pontos de
+// milhar da mascara (Story 1.10) misturados com um valor colado (ex.
+// "1500.00", formato US). Regra: virgula sempre e decimal se presente; um
+// unico ponto com ate 2 digitos depois (e nenhuma virgula) tambem e tratado
+// como decimal (compatibilidade com colar valores US); qualquer outro caso
+// de ponto(s) e so separador de milhar, descartado na hora de extrair digitos.
+function splitIntAndDecimalDigits(raw: string): {
+  intDigits: string;
+  decDigits?: string;
+} {
+  const commaIndex = raw.lastIndexOf(",");
+  const dotIndex = raw.lastIndexOf(".");
+  const dotCount = (raw.match(/\./g) ?? []).length;
+
+  const dotIsDecimal =
+    commaIndex === -1 && dotCount === 1 && raw.length - dotIndex - 1 <= 2;
+  const decimalIndex =
+    commaIndex !== -1 ? commaIndex : dotIsDecimal ? dotIndex : -1;
+
+  if (decimalIndex === -1) {
+    return { intDigits: raw.replace(/\D/g, "") };
+  }
+
+  return {
+    intDigits: raw.slice(0, decimalIndex).replace(/\D/g, ""),
+    decDigits: raw
+      .slice(decimalIndex + 1)
+      .replace(/\D/g, "")
+      .slice(0, 2),
+  };
+}
+
+// Formata o valor digitado com separador de milhar (pt-BR) em tempo real,
+// mantendo a parte decimal exatamente como o usuario esta digitando (sem
+// preencher com zero antes do blur).
+function formatWithThousands(raw: string): string {
+  const { intDigits, decDigits } = splitIntAndDecimalDigits(raw);
+  const grouped = intDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return decDigits === undefined ? grouped : `${grouped},${decDigits}`;
+}
+
 function parseToCents(raw: string): number {
   const cleaned = raw.trim();
   if (!cleaned) return 0;
 
-  const lastComma = cleaned.lastIndexOf(",");
-  const lastDot = cleaned.lastIndexOf(".");
-  const decimalIndex = Math.max(lastComma, lastDot);
-
-  let normalized: string;
-  if (decimalIndex === -1) {
-    normalized = cleaned.replace(/[^\d-]/g, "");
-  } else {
-    const intPart = cleaned.slice(0, decimalIndex).replace(/[^\d-]/g, "");
-    const decPart = cleaned
-      .slice(decimalIndex + 1)
-      .replace(/[^\d]/g, "")
-      .padEnd(2, "0")
-      .slice(0, 2);
-    normalized = `${intPart}.${decPart}`;
-  }
+  const { intDigits, decDigits } = splitIntAndDecimalDigits(cleaned);
+  const normalized = `${intDigits || "0"}.${(decDigits ?? "").padEnd(2, "0").slice(0, 2)}`;
 
   const value = Number.parseFloat(normalized);
   if (Number.isNaN(value)) return 0;
@@ -84,7 +108,7 @@ export function CurrencyInput({
         disabled={disabled}
         className="w-full bg-transparent outline-none"
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => setText(formatWithThousands(e.target.value))}
         onBlur={handleBlur}
       />
     </div>

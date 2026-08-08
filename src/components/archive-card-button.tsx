@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { archiveCard } from "@/lib/actions/card-actions";
 import { Button } from "@/components/ui/button";
 
@@ -18,6 +19,7 @@ export function ArchiveCardButton({ cardId }: { cardId: string }) {
         setError(result.error);
         return;
       }
+      toast.success("Cartão arquivado.");
       router.push("/cards");
       router.refresh();
     });

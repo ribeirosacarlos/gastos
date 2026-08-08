@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch, Controller } from "react-hook-form";
+import { toast } from "sonner";
 import { createCard } from "@/lib/actions/card-actions";
 import { cardSchema, type CardInput } from "@/lib/validation/schemas";
 import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from "@/lib/money";
@@ -46,6 +47,7 @@ export default function NewCardPage() {
       return;
     }
 
+    toast.success("Cartão criado.");
     router.push("/cards");
     router.refresh();
   }

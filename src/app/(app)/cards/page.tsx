@@ -13,7 +13,7 @@ export default async function CardsPage() {
   });
 
   return (
-    <main className="mx-auto max-w-2xl p-4">
+    <main className="p-4">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold">Cartões</h1>
         <Link href="/cards/new" className={buttonVariants()}>

@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { QuickAddFab } from "@/components/quick-add-fab";
+import { AppShell } from "@/components/app-shell";
 
 export default async function AppLayout({
   children,
@@ -8,8 +9,7 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   // Redundante com o middleware, mas garante o usuario disponivel pro
-  // subtree e serve de base pro AppShell (nav mobile/desktop) que sera
-  // adicionado nas Stories de Dashboard/Polish.
+  // subtree.
   const session = await requireUser();
 
   const [cards, user] = await Promise.all([
@@ -21,7 +21,7 @@ export default async function AppLayout({
   ]);
 
   return (
-    <>
+    <AppShell>
       {children}
       <QuickAddFab
         cards={cards.map((c) => ({
@@ -31,6 +31,6 @@ export default async function AppLayout({
         }))}
         defaultCardId={user?.lastUsedCardId ?? undefined}
       />
-    </>
+    </AppShell>
   );
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch, Controller } from "react-hook-form";
+import { toast } from "sonner";
 import { createPurchase } from "@/lib/actions/purchase-actions";
 import { purchaseSchema, type PurchaseInput } from "@/lib/validation/schemas";
 import { CurrencyInput } from "@/components/currency-input";
@@ -98,6 +99,7 @@ export function QuickAddSheet({
       return;
     }
 
+    toast.success("Gasto registrado.");
     setShowMoreOptions(false);
     reset(defaultValues(initialCardId));
     onOpenChange(false);

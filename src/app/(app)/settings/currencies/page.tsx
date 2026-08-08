@@ -14,7 +14,7 @@ export default async function CurrenciesSettingsPage() {
   );
 
   return (
-    <main className="mx-auto max-w-2xl p-4">
+    <main className="p-4">
       <h1 className="mb-1 text-xl font-semibold">Câmbio</h1>
       <p className="mb-4 text-sm text-muted-foreground">
         Taxas usadas pra calcular o total combinado aproximado em BRL no

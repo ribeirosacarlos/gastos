@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch, Controller } from "react-hook-form";
+import { toast } from "sonner";
 import { createFixedExpense } from "@/lib/actions/fixed-expense-actions";
 import {
   fixedExpenseSchema,
@@ -63,6 +64,7 @@ export default function NewFixedExpensePage() {
       return;
     }
 
+    toast.success("Gasto fixo criado.");
     router.push("/fixed-expenses");
     router.refresh();
   }

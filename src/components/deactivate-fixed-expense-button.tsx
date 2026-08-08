@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { deactivateFixedExpense } from "@/lib/actions/fixed-expense-actions";
 import { Button } from "@/components/ui/button";
 
@@ -22,6 +23,7 @@ export function DeactivateFixedExpenseButton({
         setError(result.error);
         return;
       }
+      toast.success("Gasto fixo desativado.");
       router.push("/fixed-expenses");
       router.refresh();
     });

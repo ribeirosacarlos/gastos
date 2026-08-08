@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch, Controller } from "react-hook-form";
+import { toast } from "sonner";
 import { createPurchase } from "@/lib/actions/purchase-actions";
 import {
   simulatePurchase,
@@ -106,6 +107,7 @@ export function SimulateForm({ cards, defaultCardId }: SimulateFormProps) {
       return;
     }
 
+    toast.success("Compra confirmada.");
     router.push("/purchases");
     router.refresh();
   }

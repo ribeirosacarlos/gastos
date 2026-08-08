@@ -58,7 +58,7 @@ export default async function DashboardPage() {
   );
 
   return (
-    <main className="mx-auto max-w-2xl space-y-6 p-4">
+    <main className="space-y-6 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Dashboard</h1>
         <UserBadge name={user.username} />

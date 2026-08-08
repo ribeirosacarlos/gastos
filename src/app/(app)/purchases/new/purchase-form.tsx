@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch, Controller } from "react-hook-form";
+import { toast } from "sonner";
 import { createPurchase } from "@/lib/actions/purchase-actions";
 import { purchaseSchema, type PurchaseInput } from "@/lib/validation/schemas";
 import { CurrencyInput } from "@/components/currency-input";
@@ -67,6 +68,7 @@ export function NewPurchaseForm({ cards, defaultCardId }: NewPurchaseFormProps) 
       return;
     }
 
+    toast.success("Compra registrada.");
     router.push("/purchases");
     router.refresh();
   }
