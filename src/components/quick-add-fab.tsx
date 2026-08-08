@@ -8,6 +8,7 @@ interface CardOption {
   id: string;
   name: string;
   currency: string;
+  color: string;
 }
 
 interface QuickAddFabProps {

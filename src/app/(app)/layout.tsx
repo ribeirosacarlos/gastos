@@ -29,6 +29,7 @@ export default async function AppLayout({
           id: c.id,
           name: c.name,
           currency: c.currency,
+          color: c.color,
         }))}
         defaultCardId={user?.lastUsedCardId ?? undefined}
         otherUserName={otherUser?.name}

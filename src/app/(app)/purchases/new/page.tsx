@@ -24,6 +24,7 @@ export default async function NewPurchasePage() {
           id: c.id,
           name: c.name,
           currency: c.currency,
+          color: c.color,
         }))}
         defaultCardId={user?.lastUsedCardId ?? undefined}
         otherUserName={otherUser?.name}

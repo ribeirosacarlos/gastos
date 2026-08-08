@@ -20,6 +20,7 @@ interface CardOption {
   id: string;
   name: string;
   currency: string;
+  color: string;
 }
 
 interface SimulateFormProps {
@@ -133,17 +134,24 @@ export function SimulateForm({
           <label htmlFor="cardId" className="text-sm font-medium">
             Cartão
           </label>
-          <select
-            id="cardId"
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            {...register("cardId", { required: true })}
-          >
-            {cards.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} ({c.currency})
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-block h-3 w-3 shrink-0 rounded-full"
+              style={{ backgroundColor: selectedCard?.color ?? "#64748b" }}
+            />
+            <select
+              id="cardId"
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              {...register("cardId", { required: true })}
+            >
+              {cards.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.currency !== "BRL" ? ` (${c.currency})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="space-y-1">

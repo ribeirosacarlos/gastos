@@ -59,8 +59,17 @@ export default async function CardDetailPage({
         </div>
       </dl>
 
+      <div className="mt-6">
+        <Link
+          href={`/purchases?cardId=${card.id}`}
+          className={buttonVariants({ variant: "outline" })}
+        >
+          Ver compras deste cartão
+        </Link>
+      </div>
+
       {card.isActive && (
-        <div className="mt-6 flex items-center gap-2">
+        <div className="mt-2 flex items-center gap-2">
           <Link
             href={`/cards/${card.id}/edit`}
             className={buttonVariants({ variant: "outline" })}
