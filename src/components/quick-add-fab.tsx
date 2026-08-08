@@ -13,9 +13,14 @@ interface CardOption {
 interface QuickAddFabProps {
   cards: CardOption[];
   defaultCardId?: string;
+  otherUserName?: string;
 }
 
-export function QuickAddFab({ cards, defaultCardId }: QuickAddFabProps) {
+export function QuickAddFab({
+  cards,
+  defaultCardId,
+  otherUserName,
+}: QuickAddFabProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -33,6 +38,7 @@ export function QuickAddFab({ cards, defaultCardId }: QuickAddFabProps) {
         onOpenChange={setOpen}
         cards={cards}
         defaultCardId={defaultCardId}
+        otherUserName={otherUserName}
       />
     </>
   );

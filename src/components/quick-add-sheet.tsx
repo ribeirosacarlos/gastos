@@ -27,6 +27,7 @@ interface QuickAddSheetProps {
   onOpenChange: (open: boolean) => void;
   cards: CardOption[];
   defaultCardId?: string;
+  otherUserName?: string;
 }
 
 const DEFAULT_DESCRIPTION = "Gasto rápido";
@@ -51,6 +52,7 @@ export function QuickAddSheet({
   onOpenChange,
   cards,
   defaultCardId,
+  otherUserName,
 }: QuickAddSheetProps) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -74,6 +76,7 @@ export function QuickAddSheet({
   const cardId = useWatch({ control, name: "cardId" });
   const selectedCard = cards.find((c) => c.id === cardId);
   const currency = selectedCard?.currency ?? "BRL";
+  const isShared = useWatch({ control, name: "isShared" });
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
@@ -222,6 +225,11 @@ export function QuickAddSheet({
                   <input type="checkbox" {...register("isShared")} />
                   Compra compartilhada (conta 50/50 pros dois)
                 </label>
+                {isShared && otherUserName && (
+                  <p className="text-xs text-muted-foreground">
+                    Compartilhando com: {otherUserName}
+                  </p>
+                )}
               </div>
             )}
 

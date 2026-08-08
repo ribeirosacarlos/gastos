@@ -1,16 +1,17 @@
-import { requireUser } from "@/lib/auth";
+import { requireUser, getOtherUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { NewPurchaseForm } from "./purchase-form";
 
 export default async function NewPurchasePage() {
   const session = await requireUser();
 
-  const [cards, user] = await Promise.all([
+  const [cards, user, otherUser] = await Promise.all([
     db.card.findMany({
       where: { ownerUserId: session.userId, isActive: true },
       orderBy: { createdAt: "desc" },
     }),
     db.user.findUnique({ where: { id: session.userId } }),
+    getOtherUser(session.userId),
   ]);
 
   return (
@@ -23,6 +24,7 @@ export default async function NewPurchasePage() {
           currency: c.currency,
         }))}
         defaultCardId={user?.lastUsedCardId ?? undefined}
+        otherUserName={otherUser?.name}
       />
     </main>
   );

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireUser, getOtherUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
 import { buttonVariants } from "@/components/ui/button";
@@ -10,12 +10,15 @@ export default async function FixedExpensesPage() {
 
   await ensureRollingInstallments();
 
-  const fixedExpenses = await db.fixedExpense.findMany({
-    where: {
-      OR: [{ ownerUserId: user.userId }, { isShared: true }],
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const [fixedExpenses, otherUser] = await Promise.all([
+    db.fixedExpense.findMany({
+      where: {
+        OR: [{ ownerUserId: user.userId }, { isShared: true }],
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    getOtherUser(user.userId),
+  ]);
 
   return (
     <main className="p-4">
@@ -43,7 +46,7 @@ export default async function FixedExpensesPage() {
                   <div className="flex gap-1">
                     {fe.isShared && (
                       <span className="rounded bg-muted px-2 py-0.5 text-xs">
-                        Compartilhada
+                        Compartilhada{otherUser ? ` com ${otherUser.name}` : ""}
                       </span>
                     )}
                     {!fe.isActive && (

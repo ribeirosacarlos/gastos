@@ -18,13 +18,18 @@ interface CardOption {
 interface NewPurchaseFormProps {
   cards: CardOption[];
   defaultCardId?: string;
+  otherUserName?: string;
 }
 
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function NewPurchaseForm({ cards, defaultCardId }: NewPurchaseFormProps) {
+export function NewPurchaseForm({
+  cards,
+  defaultCardId,
+  otherUserName,
+}: NewPurchaseFormProps) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -52,6 +57,7 @@ export function NewPurchaseForm({ cards, defaultCardId }: NewPurchaseFormProps) 
   const cardId = useWatch({ control, name: "cardId" });
   const selectedCard = cards.find((c) => c.id === cardId);
   const currency = selectedCard?.currency ?? "BRL";
+  const isShared = useWatch({ control, name: "isShared" });
 
   async function onSubmit(values: PurchaseInput) {
     setServerError(null);
@@ -168,6 +174,11 @@ export function NewPurchaseForm({ cards, defaultCardId }: NewPurchaseFormProps) 
         <input type="checkbox" {...register("isShared")} />
         Compra compartilhada (conta 50/50 pros dois)
       </label>
+      {isShared && otherUserName && (
+        <p className="text-xs text-muted-foreground">
+          Compartilhando com: {otherUserName}
+        </p>
+      )}
 
       {serverError && (
         <p className="text-sm text-red-600" role="alert">

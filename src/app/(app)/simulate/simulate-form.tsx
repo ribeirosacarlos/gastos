@@ -25,13 +25,18 @@ interface CardOption {
 interface SimulateFormProps {
   cards: CardOption[];
   defaultCardId?: string;
+  otherUserName?: string;
 }
 
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function SimulateForm({ cards, defaultCardId }: SimulateFormProps) {
+export function SimulateForm({
+  cards,
+  defaultCardId,
+  otherUserName,
+}: SimulateFormProps) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -66,6 +71,7 @@ export function SimulateForm({ cards, defaultCardId }: SimulateFormProps) {
   const cardId = useWatch({ control, name: "cardId" });
   const selectedCard = cards.find((c) => c.id === cardId);
   const currency = selectedCard?.currency ?? "BRL";
+  const isShared = useWatch({ control, name: "isShared" });
 
   async function handleCalculate(values: PurchaseInput) {
     setServerError(null);
@@ -208,6 +214,11 @@ export function SimulateForm({ cards, defaultCardId }: SimulateFormProps) {
           <input type="checkbox" {...register("isShared")} />
           Compra compartilhada (conta 50/50 pros dois)
         </label>
+        {isShared && otherUserName && (
+          <p className="text-xs text-muted-foreground">
+            Compartilhando com: {otherUserName}
+          </p>
+        )}
 
         {serverError && (
           <p className="text-sm text-red-600" role="alert">

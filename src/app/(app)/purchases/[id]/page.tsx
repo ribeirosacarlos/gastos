@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireUser, getOtherUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
 import { InstallmentPreviewTable } from "@/components/installment-preview-table";
@@ -13,13 +13,16 @@ export default async function PurchaseDetailPage({
   const { id } = await params;
   const user = await requireUser();
 
-  const purchase = await db.purchase.findUnique({
-    where: { id },
-    include: {
-      card: true,
-      installments: { orderBy: { installmentNumber: "asc" } },
-    },
-  });
+  const [purchase, otherUser] = await Promise.all([
+    db.purchase.findUnique({
+      where: { id },
+      include: {
+        card: true,
+        installments: { orderBy: { installmentNumber: "asc" } },
+      },
+    }),
+    getOtherUser(user.userId),
+  ]);
 
   const visible =
     purchase && (purchase.isShared || purchase.ownerUserId === user.userId);
@@ -35,7 +38,8 @@ export default async function PurchaseDetailPage({
         {purchase.card.name} ·{" "}
         {centsToDisplay(purchase.totalCents, purchase.card.currency)} em{" "}
         {purchase.installmentsCount}x
-        {purchase.isShared && " · Compartilhada"}
+        {purchase.isShared &&
+          ` · Compartilhada${otherUser ? ` com ${otherUser.name}` : ""}`}
       </p>
 
       <InstallmentPreviewTable

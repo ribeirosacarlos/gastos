@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireUser, getOtherUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
 import { InstallmentPreviewTable } from "@/components/installment-preview-table";
@@ -14,14 +14,17 @@ export default async function FixedExpenseDetailPage({
   const { id } = await params;
   const user = await requireUser();
 
-  const fixedExpense = await db.fixedExpense.findUnique({
-    where: { id },
-    include: {
-      installments: {
-        orderBy: [{ referenceYear: "asc" }, { referenceMonth: "asc" }],
+  const [fixedExpense, otherUser] = await Promise.all([
+    db.fixedExpense.findUnique({
+      where: { id },
+      include: {
+        installments: {
+          orderBy: [{ referenceYear: "asc" }, { referenceMonth: "asc" }],
+        },
       },
-    },
-  });
+    }),
+    getOtherUser(user.userId),
+  ]);
 
   const visible =
     fixedExpense &&
@@ -41,7 +44,8 @@ export default async function FixedExpenseDetailPage({
         {fixedExpense.totalInstallments
           ? `${fixedExpense.totalInstallments}x`
           : "Indefinido"}
-        {fixedExpense.isShared && " · Compartilhado"}
+        {fixedExpense.isShared &&
+          ` · Compartilhado${otherUser ? ` com ${otherUser.name}` : ""}`}
         {!fixedExpense.isActive && " · Inativo"}
       </p>
 
