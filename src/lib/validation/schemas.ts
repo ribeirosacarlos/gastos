@@ -36,3 +36,20 @@ export const cardSchema = z.object({
 });
 
 export type CardInput = z.infer<typeof cardSchema>;
+
+export const purchaseSchema = z.object({
+  cardId: z.string().min(1, "Selecione um cartão"),
+  description: z.string().min(1, "Informe a descrição"),
+  totalCents: z.coerce
+    .number()
+    .int("Valor deve ser um valor inteiro (em centavos)")
+    .positive("Valor deve ser maior que zero"),
+  purchaseDate: z.coerce.date({ message: "Data inválida" }),
+  installmentsCount: z.coerce
+    .number()
+    .int("Número de parcelas deve ser inteiro")
+    .min(1, "Mínimo de 1 parcela"),
+  isShared: z.coerce.boolean(),
+});
+
+export type PurchaseInput = z.infer<typeof purchaseSchema>;

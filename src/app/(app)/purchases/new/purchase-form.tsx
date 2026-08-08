@@ -1,0 +1,181 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useForm, useWatch, Controller } from "react-hook-form";
+import { createPurchase } from "@/lib/actions/purchase-actions";
+import { purchaseSchema, type PurchaseInput } from "@/lib/validation/schemas";
+import { CurrencyInput } from "@/components/currency-input";
+import { Button } from "@/components/ui/button";
+
+interface CardOption {
+  id: string;
+  name: string;
+  currency: string;
+}
+
+interface NewPurchaseFormProps {
+  cards: CardOption[];
+  defaultCardId?: string;
+}
+
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function NewPurchaseForm({ cards, defaultCardId }: NewPurchaseFormProps) {
+  const router = useRouter();
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  const initialCardId =
+    (defaultCardId && cards.some((c) => c.id === defaultCardId)
+      ? defaultCardId
+      : cards[0]?.id) ?? "";
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { isSubmitting },
+  } = useForm<PurchaseInput>({
+    defaultValues: {
+      cardId: initialCardId,
+      description: "",
+      totalCents: 0,
+      purchaseDate: new Date(todayIsoDate()),
+      installmentsCount: 1,
+      isShared: false,
+    },
+  });
+
+  const cardId = useWatch({ control, name: "cardId" });
+  const selectedCard = cards.find((c) => c.id === cardId);
+  const currency = selectedCard?.currency ?? "BRL";
+
+  async function onSubmit(values: PurchaseInput) {
+    setServerError(null);
+
+    const parsed = purchaseSchema.safeParse(values);
+    if (!parsed.success) {
+      setServerError(parsed.error.issues[0]?.message ?? "Dados inválidos.");
+      return;
+    }
+
+    const result = await createPurchase(parsed.data);
+    if (result.error) {
+      setServerError(result.error);
+      return;
+    }
+
+    router.push("/purchases");
+    router.refresh();
+  }
+
+  if (cards.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Você ainda não tem nenhum cartão ativo. Cadastre um cartão primeiro.
+      </p>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div className="space-y-1">
+        <label htmlFor="cardId" className="text-sm font-medium">
+          Cartão
+        </label>
+        <select
+          id="cardId"
+          className="w-full rounded-md border px-3 py-2 text-sm"
+          {...register("cardId", { required: true })}
+        >
+          {cards.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name} ({c.currency})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-1">
+        <label htmlFor="description" className="text-sm font-medium">
+          Descrição
+        </label>
+        <input
+          id="description"
+          type="text"
+          className="w-full rounded-md border px-3 py-2 text-sm"
+          {...register("description", { required: true })}
+        />
+      </div>
+
+      <div className="space-y-1">
+        <label htmlFor="totalCents" className="text-sm font-medium">
+          Valor
+        </label>
+        <Controller
+          control={control}
+          name="totalCents"
+          render={({ field }) => (
+            <CurrencyInput
+              id="totalCents"
+              currency={currency}
+              value={field.value}
+              onChange={field.onChange}
+            />
+          )}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <label htmlFor="purchaseDate" className="text-sm font-medium">
+            Data da compra
+          </label>
+          <input
+            id="purchaseDate"
+            type="date"
+            defaultValue={todayIsoDate()}
+            className="w-full rounded-md border px-3 py-2 text-sm"
+            {...register("purchaseDate", {
+              valueAsDate: true,
+              required: true,
+            })}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor="installmentsCount" className="text-sm font-medium">
+            Nº de parcelas
+          </label>
+          <input
+            id="installmentsCount"
+            type="number"
+            min={1}
+            className="w-full rounded-md border px-3 py-2 text-sm"
+            {...register("installmentsCount", {
+              valueAsNumber: true,
+              required: true,
+            })}
+          />
+        </div>
+      </div>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" {...register("isShared")} />
+        Compra compartilhada (conta 50/50 pros dois)
+      </label>
+
+      {serverError && (
+        <p className="text-sm text-red-600" role="alert">
+          {serverError}
+        </p>
+      )}
+
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? "Salvando..." : "Salvar"}
+      </Button>
+    </form>
+  );
+}

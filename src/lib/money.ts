@@ -26,6 +26,19 @@ export function centsToDisplay(cents: number, currency: string): string {
   }).format(cents / 100);
 }
 
-// splitValue, userShareCents e convertToBRL (logica de parcelamento, split
-// 50/50 e cambio) entram nas Stories 1.4 (parcelas) e 1.7 (cambio) - fora do
-// escopo desta story (CRUD de Cartoes).
+// Divide totalCents em n parcelas cuja soma bate exatamente com o total,
+// sem perda por arredondamento: base = floor(total/n), resto (em centavos)
+// distribuido 1 a 1 nas primeiras parcelas.
+export function splitValue(totalCents: number, n: number): number[] {
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error("n deve ser um inteiro >= 1");
+  }
+
+  const base = Math.floor(totalCents / n);
+  const remainder = totalCents - base * n;
+
+  return Array.from({ length: n }, (_, i) => base + (i < remainder ? 1 : 0));
+}
+
+// userShareCents e convertToBRL (split 50/50 e cambio) entram nas Stories
+// 1.6 (split/dashboard) e 1.7 (cambio) - fora do escopo desta story.
