@@ -47,4 +47,9 @@ export function convertToBRL(cents: number, rateToBRL: number): number {
   return Math.round(cents * rateToBRL);
 }
 
-// userShareCents (split 50/50) e escopo do Dashboard - Story 1.8.
+// Metade (arredondada pra baixo) de um valor compartilhado - a visibilidade
+// de quem pode ver a linha (propria ou compartilhada) e responsabilidade da
+// query, nao desta funcao.
+export function userShareCents(valueCents: number, isShared: boolean): number {
+  return isShared ? Math.floor(valueCents / 2) : valueCents;
+}
