@@ -8,6 +8,7 @@ import { createPurchase } from "@/lib/actions/purchase-actions";
 import { purchaseSchema, type PurchaseInput } from "@/lib/validation/schemas";
 import { CurrencyInput } from "@/components/currency-input";
 import { Button } from "@/components/ui/button";
+import { getContrastTextColor } from "@/lib/utils";
 
 interface CardOption {
   id: string;
@@ -105,7 +106,14 @@ export function NewPurchaseForm({
             {...register("cardId", { required: true })}
           >
             {cards.map((c) => (
-              <option key={c.id} value={c.id}>
+              <option
+                key={c.id}
+                value={c.id}
+                style={{
+                  backgroundColor: c.color,
+                  color: getContrastTextColor(c.color),
+                }}
+              >
                 {c.name}
                 {c.currency !== "BRL" ? ` (${c.currency})` : ""}
               </option>

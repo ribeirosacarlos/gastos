@@ -15,6 +15,7 @@ import {
   SheetTitle,
   SheetFooter,
 } from "@/components/ui/sheet";
+import { getContrastTextColor } from "@/lib/utils";
 
 interface CardOption {
   id: string;
@@ -160,7 +161,14 @@ export function QuickAddSheet({
                   {...register("cardId", { required: true })}
                 >
                   {cards.map((c) => (
-                    <option key={c.id} value={c.id}>
+                    <option
+                      key={c.id}
+                      value={c.id}
+                      style={{
+                        backgroundColor: c.color,
+                        color: getContrastTextColor(c.color),
+                      }}
+                    >
                       {c.name}
                       {c.currency !== "BRL" ? ` (${c.currency})` : ""}
                     </option>

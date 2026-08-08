@@ -15,6 +15,7 @@ import { CurrencyInput } from "@/components/currency-input";
 import { InstallmentPreviewTable } from "@/components/installment-preview-table";
 import { Button } from "@/components/ui/button";
 import { centsToDisplay } from "@/lib/money";
+import { getContrastTextColor } from "@/lib/utils";
 
 interface CardOption {
   id: string;
@@ -145,7 +146,14 @@ export function SimulateForm({
               {...register("cardId", { required: true })}
             >
               {cards.map((c) => (
-                <option key={c.id} value={c.id}>
+                <option
+                  key={c.id}
+                  value={c.id}
+                  style={{
+                    backgroundColor: c.color,
+                    color: getContrastTextColor(c.color),
+                  }}
+                >
                   {c.name}
                   {c.currency !== "BRL" ? ` (${c.currency})` : ""}
                 </option>
