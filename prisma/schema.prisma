@@ -32,6 +32,9 @@ model Card {
   // Codigo ISO 4217. String (nao enum) para permitir novas moedas sem migration
   // - ver SUPPORTED_CURRENCIES em lib/money.ts (Story 1.4+)
   currency    String   @default("BRL")
+  // Hex de 6 digitos (#rrggbb), validado na aplicacao (cardSchema). Livre,
+  // nao enum - mesmo padrao de currency.
+  color       String   @default("#64748b")
   closingDay  Int
   dueDay      Int
   ownerUserId String

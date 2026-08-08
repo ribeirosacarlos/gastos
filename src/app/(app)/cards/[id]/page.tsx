@@ -20,7 +20,13 @@ export default async function CardDetailPage({
 
   return (
     <main className="mx-auto max-w-sm p-4">
-      <h1 className="mb-4 text-xl font-semibold">{card.name}</h1>
+      <h1 className="mb-4 flex items-center gap-2 text-xl font-semibold">
+        <span
+          className="inline-block h-4 w-4 shrink-0 rounded-full"
+          style={{ backgroundColor: card.color }}
+        />
+        {card.name}
+      </h1>
 
       <dl className="space-y-2 text-sm">
         <div className="flex justify-between">

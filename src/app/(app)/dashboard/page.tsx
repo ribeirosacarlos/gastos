@@ -5,32 +5,61 @@ import {
   getCardLimits,
   getMonthlyTimeline,
   getCombinedBRLTotal,
+  getActiveCardColors,
 } from "@/lib/actions/dashboard-actions";
 import { UserBadge } from "@/components/user-badge";
 import { LimitProgressBar } from "@/components/limit-progress-bar";
-import { MonthTimelineChart, type MonthBarData } from "@/components/month-timeline-chart";
+import {
+  MonthTimelineChart,
+  FIXED_EXPENSES_COLOR,
+  FIXED_EXPENSES_KEY,
+  type MonthBarData,
+} from "@/components/month-timeline-chart";
 
 export default async function DashboardPage() {
   const user = await requireUser();
 
   await ensureRollingInstallments();
 
-  const [cardLimits, timeline] = await Promise.all([
+  const [cardLimits, timeline, cardColors] = await Promise.all([
     getCardLimits(),
     getMonthlyTimeline(),
+    getActiveCardColors(),
   ]);
 
   const monthBars: MonthBarData[] = await Promise.all(
     timeline.map(async (m) => {
-      const [purchasesBRL, fixedBRL] = await Promise.all([
-        getCombinedBRLTotal(m.breakdown.purchases),
+      const [cardSegments, fixedBRL] = await Promise.all([
+        Promise.all(
+          cardColors.map(async (card) => {
+            const cents = m.byCard[card.id] ?? 0;
+            const result =
+              cents > 0
+                ? await getCombinedBRLTotal({ [card.currency]: cents })
+                : { totalBRLCents: 0 };
+            return {
+              key: card.id,
+              label: card.name,
+              color: card.color,
+              valueBRLCents: result.totalBRLCents,
+            };
+          })
+        ),
         getCombinedBRLTotal(m.breakdown.fixedExpenses),
       ]);
+
       return {
         year: m.year,
         month: m.month,
-        purchasesBRLCents: purchasesBRL.totalBRLCents,
-        fixedBRLCents: fixedBRL.totalBRLCents,
+        segments: [
+          ...cardSegments,
+          {
+            key: FIXED_EXPENSES_KEY,
+            label: "Fixos",
+            color: FIXED_EXPENSES_COLOR,
+            valueBRLCents: fixedBRL.totalBRLCents,
+          },
+        ],
       };
     })
   );

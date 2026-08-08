@@ -27,6 +27,7 @@ export default function NewCardPage() {
       limitCents: 0,
       closingDay: 1,
       dueDay: 10,
+      color: "#64748b",
     },
   });
 
@@ -96,6 +97,18 @@ export default function NewCardPage() {
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor="color" className="text-sm font-medium">
+            Cor
+          </label>
+          <input
+            id="color"
+            type="color"
+            className="h-9 w-16 rounded-md border p-1"
+            {...register("color")}
+          />
         </div>
 
         <div className="space-y-1">

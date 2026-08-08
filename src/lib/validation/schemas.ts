@@ -33,6 +33,7 @@ export const cardSchema = z.object({
     .int()
     .min(1, "Dia de vencimento deve estar entre 1 e 31")
     .max(31, "Dia de vencimento deve estar entre 1 e 31"),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida"),
 });
 
 export type CardInput = z.infer<typeof cardSchema>;

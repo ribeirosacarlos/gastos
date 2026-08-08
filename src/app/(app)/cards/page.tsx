@@ -34,7 +34,13 @@ export default async function CardsPage() {
                 className="block rounded-lg border p-4 hover:bg-accent"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{card.name}</span>
+                  <span className="flex items-center gap-2 font-medium">
+                    <span
+                      className="inline-block h-3 w-3 shrink-0 rounded-full"
+                      style={{ backgroundColor: card.color }}
+                    />
+                    {card.name}
+                  </span>
                   <span className="text-sm text-muted-foreground">
                     {card.bank}
                   </span>

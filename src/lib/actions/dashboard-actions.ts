@@ -67,6 +67,10 @@ export interface MonthlyTotal {
     purchases: Record<string, number>;
     fixedExpenses: Record<string, number>;
   };
+  // Minha parte (userShareCents) do gasto em compras naquele mes, por
+  // cartao - na moeda do proprio cartao (cada cartao tem uma unica moeda,
+  // sem ambiguidade). Gastos fixos nao entram aqui (nao tem cartao).
+  byCard: Record<string, number>;
 }
 
 function addTo(record: Record<string, number>, currency: string, amount: number) {
@@ -110,6 +114,7 @@ export async function getMonthlyTimeline(
     const coupleTotals: Record<string, number> = {};
     const breakdownPurchases: Record<string, number> = {};
     const breakdownFixedExpenses: Record<string, number> = {};
+    const byCard: Record<string, number> = {};
 
     for (const pi of purchaseInstallments) {
       if (pi.referenceYear !== m.year || pi.referenceMonth !== m.month) continue;
@@ -118,6 +123,7 @@ export async function getMonthlyTimeline(
       addTo(myTotals, currency, share);
       addTo(coupleTotals, currency, pi.valueCents);
       addTo(breakdownPurchases, currency, share);
+      addTo(byCard, pi.purchase.cardId, share);
     }
 
     for (const fi of fixedExpenseInstallments) {
@@ -138,7 +144,25 @@ export async function getMonthlyTimeline(
         purchases: breakdownPurchases,
         fixedExpenses: breakdownFixedExpenses,
       },
+      byCard,
     };
+  });
+}
+
+export interface CardColor {
+  id: string;
+  name: string;
+  currency: string;
+  color: string;
+}
+
+export async function getActiveCardColors(): Promise<CardColor[]> {
+  const user = await requireUser();
+
+  return db.card.findMany({
+    where: { ownerUserId: user.userId, isActive: true },
+    select: { id: true, name: true, currency: true, color: true },
+    orderBy: { createdAt: "desc" },
   });
 }
 
