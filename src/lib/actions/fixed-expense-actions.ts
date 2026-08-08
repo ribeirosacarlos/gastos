@@ -97,6 +97,11 @@ export async function createFixedExpense(
 // isolado antes de implementar - ver Dev Notes da Story 1.6), entao a
 // checagem de duplicidade e feita manualmente buscando os meses existentes
 // antes do createMany.
+//
+// Sem revalidatePath aqui de proposito: esta funcao e chamada durante o
+// render de paginas (Story 1.6/1.8), nao como reacao a uma mutacao de
+// usuario - chamar revalidatePath em render nao e suportado pelo Next e a
+// propria pagina que chama isso ja busca dados frescos na sequencia.
 export async function ensureRollingInstallments(): Promise<void> {
   const user = await requireUser();
 
@@ -150,8 +155,6 @@ export async function ensureRollingInstallments(): Promise<void> {
       })),
     });
   }
-
-  revalidatePath("/fixed-expenses");
 }
 
 export type ToggleFixedExpenseInstallmentPaidResult = { error?: string };
