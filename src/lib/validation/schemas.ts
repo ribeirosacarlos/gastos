@@ -36,6 +36,13 @@ export const cardSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida"),
 });
 
+// Sem currency: mudar a moeda de um cartao com compras ja registradas
+// relabelaria o historico inteiro sem converter valores (Purchase nao tem
+// currency propria, herda de card.currency) - ver Dev Notes da Story 1.12.
+export const updateCardSchema = cardSchema.omit({ currency: true });
+
+export type UpdateCardInput = z.infer<typeof updateCardSchema>;
+
 export type CardInput = z.infer<typeof cardSchema>;
 
 export const purchaseSchema = z.object({

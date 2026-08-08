@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
 import { ArchiveCardButton } from "@/components/archive-card-button";
+import { buttonVariants } from "@/components/ui/button";
 
 export default async function CardDetailPage({
   params,
@@ -56,7 +58,13 @@ export default async function CardDetailPage({
       </dl>
 
       {card.isActive && (
-        <div className="mt-6">
+        <div className="mt-6 flex items-center gap-2">
+          <Link
+            href={`/cards/${card.id}/edit`}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            Editar
+          </Link>
           <ArchiveCardButton cardId={card.id} />
         </div>
       )}
