@@ -22,6 +22,12 @@ export default async function CardDetailPage({
 
   return (
     <main className="mx-auto max-w-sm p-4">
+      <Link
+        href="/cards"
+        className="mb-4 inline-block text-sm text-muted-foreground hover:underline"
+      >
+        ← Voltar para cartões
+      </Link>
       <h1 className="mb-4 flex items-center gap-2 text-xl font-semibold">
         <span
           className="inline-block h-4 w-4 shrink-0 rounded-full"
