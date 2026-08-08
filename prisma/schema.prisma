@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +8,115 @@ generator client {
 
 datasource db {
   provider = "sqlite"
+}
+
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  username       String   @unique
+  passwordHash   String
+  lastUsedCardId String?
+  lastUsedCard   Card?    @relation("UserLastUsedCard", fields: [lastUsedCardId], references: [id])
+  createdAt      DateTime @default(now())
+
+  ownedCards         Card[]         @relation("CardOwner")
+  ownedPurchases     Purchase[]     @relation("PurchaseOwner")
+  ownedFixedExpenses FixedExpense[] @relation("FixedExpenseOwner")
+}
+
+model Card {
+  id          String   @id @default(cuid())
+  name        String
+  bank        String
+  limitCents  Int
+  // Codigo ISO 4217. String (nao enum) para permitir novas moedas sem migration
+  // - ver SUPPORTED_CURRENCIES em lib/money.ts (Story 1.4+)
+  currency    String   @default("BRL")
+  closingDay  Int
+  dueDay      Int
+  ownerUserId String
+  owner       User     @relation("CardOwner", fields: [ownerUserId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  purchases    Purchase[]
+  lastUsedByUsers User[] @relation("UserLastUsedCard")
+}
+
+model Purchase {
+  id                String   @id @default(cuid())
+  cardId            String
+  card              Card     @relation(fields: [cardId], references: [id])
+  description       String
+  totalCents        Int
+  purchaseDate      DateTime
+  installmentsCount Int
+  // isShared=true -> ownerUserId deve ser NULL (conta 50/50 pros dois)
+  // isShared=false -> ownerUserId obrigatorio (conta 100% pro dono)
+  // Invariante validada na camada de aplicacao (Server Actions), Prisma/SQLite
+  // nao tem suporte nativo a CHECK constraints declarativos no schema.
+  isShared          Boolean  @default(false)
+  ownerUserId       String?
+  owner             User?    @relation("PurchaseOwner", fields: [ownerUserId], references: [id])
+  createdAt         DateTime @default(now())
+
+  installments PurchaseInstallment[]
+}
+
+model PurchaseInstallment {
+  id                String    @id @default(cuid())
+  purchaseId        String
+  purchase          Purchase  @relation(fields: [purchaseId], references: [id])
+  installmentNumber Int
+  referenceYear     Int
+  referenceMonth    Int
+  valueCents        Int
+  paid              Boolean   @default(false)
+  paidAt            DateTime?
+
+  @@unique([purchaseId, installmentNumber])
+  @@index([referenceYear, referenceMonth])
+}
+
+model FixedExpense {
+  id          String   @id @default(cuid())
+  description String
+  valueCents  Int
+  // Codigo ISO 4217, default BRL. Sem cartao associado, entao carrega a propria moeda.
+  currency    String   @default("BRL")
+  startYear   Int
+  startMonth  Int
+  // null = recorrente indefinido (ex. aluguel); numero = quantidade fixa de parcelas
+  totalInstallments Int?
+  // Mesma invariante isShared/ownerUserId do Purchase (validada na aplicacao)
+  isShared    Boolean  @default(false)
+  ownerUserId String?
+  owner       User?    @relation("FixedExpenseOwner", fields: [ownerUserId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  installments FixedExpenseInstallment[]
+}
+
+model FixedExpenseInstallment {
+  id                String    @id @default(cuid())
+  fixedExpenseId    String
+  fixedExpense      FixedExpense @relation(fields: [fixedExpenseId], references: [id])
+  installmentNumber Int
+  referenceYear     Int
+  referenceMonth    Int
+  valueCents        Int
+  paid              Boolean   @default(false)
+  paidAt            DateTime?
+
+  @@unique([fixedExpenseId, referenceYear, referenceMonth])
+}
+
+model ExchangeRate {
+  id        String   @id @default(cuid())
+  // Codigo ISO 4217, unico. Sem registro para BRL (taxa implicita = 1)
+  currency  String   @unique
+  rateToBRL Float
+  source    String
+  updatedAt DateTime @updatedAt
 }
