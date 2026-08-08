@@ -3,6 +3,7 @@ import { requireUser, getOtherUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
 import { InstallmentPreviewTable } from "@/components/installment-preview-table";
+import { BackLink } from "@/components/back-link";
 import { toggleInstallmentPaid } from "@/lib/actions/purchase-actions";
 
 export default async function PurchaseDetailPage({
@@ -33,6 +34,7 @@ export default async function PurchaseDetailPage({
 
   return (
     <main className="mx-auto max-w-sm p-4">
+      <BackLink href="/purchases" label="Voltar para compras" />
       <h1 className="mb-1 text-xl font-semibold">{purchase.description}</h1>
       <p className="mb-4 text-sm text-muted-foreground">
         {purchase.card.name} ·{" "}

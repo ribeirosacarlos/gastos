@@ -8,6 +8,7 @@ import { createCard } from "@/lib/actions/card-actions";
 import { cardSchema, type CardInput } from "@/lib/validation/schemas";
 import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from "@/lib/money";
 import { CurrencyInput } from "@/components/currency-input";
+import { BackLink } from "@/components/back-link";
 import { Button } from "@/components/ui/button";
 
 export default function NewCardPage() {
@@ -55,6 +56,7 @@ export default function NewCardPage() {
 
   return (
     <main className="mx-auto max-w-sm p-4">
+      <BackLink href="/cards" label="Voltar para cartões" />
       <h1 className="mb-4 text-xl font-semibold">Novo cartão</h1>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

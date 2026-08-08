@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
 import { InstallmentPreviewTable } from "@/components/installment-preview-table";
 import { DeactivateFixedExpenseButton } from "@/components/deactivate-fixed-expense-button";
+import { BackLink } from "@/components/back-link";
 import { toggleFixedExpenseInstallmentPaid } from "@/lib/actions/fixed-expense-actions";
 
 export default async function FixedExpenseDetailPage({
@@ -36,6 +37,7 @@ export default async function FixedExpenseDetailPage({
 
   return (
     <main className="mx-auto max-w-sm p-4">
+      <BackLink href="/fixed-expenses" label="Voltar para gastos fixos" />
       <h1 className="mb-1 text-xl font-semibold">
         {fixedExpense.description}
       </h1>

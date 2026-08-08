@@ -1,5 +1,6 @@
 import { requireUser, getOtherUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { BackLink } from "@/components/back-link";
 import { NewPurchaseForm } from "./purchase-form";
 
 export default async function NewPurchasePage() {
@@ -16,6 +17,7 @@ export default async function NewPurchasePage() {
 
   return (
     <main className="mx-auto max-w-sm p-4">
+      <BackLink href="/purchases" label="Voltar para compras" />
       <h1 className="mb-4 text-xl font-semibold">Nova compra</h1>
       <NewPurchaseForm
         cards={cards.map((c) => ({

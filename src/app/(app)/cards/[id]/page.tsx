@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
 import { ArchiveCardButton } from "@/components/archive-card-button";
+import { BackLink } from "@/components/back-link";
 import { buttonVariants } from "@/components/ui/button";
 
 export default async function CardDetailPage({
@@ -22,12 +23,7 @@ export default async function CardDetailPage({
 
   return (
     <main className="mx-auto max-w-sm p-4">
-      <Link
-        href="/cards"
-        className="mb-4 inline-block text-sm text-muted-foreground hover:underline"
-      >
-        ← Voltar para cartões
-      </Link>
+      <BackLink href="/cards" label="Voltar para cartões" />
       <h1 className="mb-4 flex items-center gap-2 text-xl font-semibold">
         <span
           className="inline-block h-4 w-4 shrink-0 rounded-full"

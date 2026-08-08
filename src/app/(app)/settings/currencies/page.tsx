@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { SUPPORTED_CURRENCIES } from "@/lib/money";
 import { CurrencyRateRow } from "@/components/currency-rate-row";
+import { BackLink } from "@/components/back-link";
 
 export default async function CurrenciesSettingsPage() {
   await requireUser();
@@ -15,6 +16,7 @@ export default async function CurrenciesSettingsPage() {
 
   return (
     <main className="p-4">
+      <BackLink href="/dashboard" label="Voltar para o dashboard" />
       <h1 className="mb-1 text-xl font-semibold">Câmbio</h1>
       <p className="mb-4 text-sm text-muted-foreground">
         Taxas usadas pra calcular o total combinado aproximado em BRL no
