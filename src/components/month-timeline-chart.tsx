@@ -59,7 +59,7 @@ export function MonthTimelineChart({ data }: MonthTimelineChartProps) {
           return (
             <div
               key={`${d.year}-${d.month}`}
-              className="flex flex-1 flex-col items-center gap-1"
+              className="flex h-full flex-1 flex-col items-center justify-end gap-1"
             >
               <span className="text-[0.65rem] text-muted-foreground">
                 {total > 0 ? centsToDisplay(total, "BRL") : ""}
