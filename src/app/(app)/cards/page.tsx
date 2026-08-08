@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { centsToDisplay } from "@/lib/money";
 import { buttonVariants } from "@/components/ui/button";
+import { CardList } from "./card-list";
 
 export default async function CardsPage() {
   const user = await requireUser();
@@ -26,37 +26,7 @@ export default async function CardsPage() {
           Nenhum cartão cadastrado ainda.
         </p>
       ) : (
-        <ul className="space-y-2">
-          {cards.map((card) => (
-            <li key={card.id}>
-              <Link
-                href={`/cards/${card.id}`}
-                className="block rounded-lg border p-4 hover:bg-accent"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 font-medium">
-                    <span
-                      className="inline-block h-3 w-3 shrink-0 rounded-full"
-                      style={{ backgroundColor: card.color }}
-                    />
-                    {card.name}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {card.bank}
-                  </span>
-                </div>
-                <div className="mt-1 flex items-center justify-between text-sm">
-                  <span>
-                    Limite: {centsToDisplay(card.limitCents, card.currency)}
-                  </span>
-                  <span>
-                    Fecha dia {card.closingDay} / Vence dia {card.dueDay}
-                  </span>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <CardList cards={cards} />
       )}
     </main>
   );
