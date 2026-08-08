@@ -79,3 +79,18 @@ export const fixedExpenseSchema = z.object({
 });
 
 export type FixedExpenseInput = z.infer<typeof fixedExpenseSchema>;
+
+const nonBrlCurrencyCodes = SUPPORTED_CURRENCIES.filter(
+  (c) => c.code !== "BRL"
+).map((c) => c.code) as [string, ...string[]];
+
+export const exchangeRateSchema = z.object({
+  currency: z.enum(nonBrlCurrencyCodes, {
+    message: "Moeda não suportada",
+  }),
+  rateToBRL: z.coerce
+    .number()
+    .positive("Taxa deve ser um número positivo"),
+});
+
+export type ExchangeRateInput = z.infer<typeof exchangeRateSchema>;

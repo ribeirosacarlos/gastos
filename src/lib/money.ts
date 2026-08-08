@@ -40,5 +40,11 @@ export function splitValue(totalCents: number, n: number): number[] {
   return Array.from({ length: n }, (_, i) => base + (i < remainder ? 1 : 0));
 }
 
-// userShareCents e convertToBRL (split 50/50 e cambio) entram nas Stories
-// 1.6 (split/dashboard) e 1.7 (cambio) - fora do escopo desta story.
+// Converte centavos de uma moeda estrangeira para centavos equivalentes em
+// BRL usando a taxa vigente (ExchangeRate.rateToBRL). BRL nunca passa por
+// aqui - sua taxa e implicitamente 1 (sem registro na tabela).
+export function convertToBRL(cents: number, rateToBRL: number): number {
+  return Math.round(cents * rateToBRL);
+}
+
+// userShareCents (split 50/50) e escopo do Dashboard - Story 1.8.
