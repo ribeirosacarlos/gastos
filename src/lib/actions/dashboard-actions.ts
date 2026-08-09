@@ -71,10 +71,29 @@ export interface MonthlyTotal {
   // cartao - na moeda do proprio cartao (cada cartao tem uma unica moeda,
   // sem ambiguidade). Gastos fixos nao entram aqui (nao tem cartao).
   byCard: Record<string, number>;
+  // categoria -> moeda -> centavos (minha parte), combinando compras E
+  // gastos fixos daquele mes. Fica por moeda (nao um numero direto) porque
+  // uma mesma categoria pode ter gastos em moedas diferentes - o chamador
+  // converte pra BRL com getCombinedBRLTotal(byCategory[categoria]), mesmo
+  // padrao ja usado pra byCard. Desvio deliberado do tipo `Record<string,
+  // number>` original da Story 1.13 - somar centavos de moedas diferentes
+  // sem converter primeiro estaria errado.
+  byCategory: Record<string, Record<string, number>>;
 }
 
 function addTo(record: Record<string, number>, currency: string, amount: number) {
   record[currency] = (record[currency] ?? 0) + amount;
+}
+
+function addToCategory(
+  byCategory: Record<string, Record<string, number>>,
+  category: string,
+  currency: string,
+  amount: number
+) {
+  const currencyMap = byCategory[category] ?? {};
+  currencyMap[currency] = (currencyMap[currency] ?? 0) + amount;
+  byCategory[category] = currencyMap;
 }
 
 export async function getMonthlyTimeline(
@@ -115,6 +134,7 @@ export async function getMonthlyTimeline(
     const breakdownPurchases: Record<string, number> = {};
     const breakdownFixedExpenses: Record<string, number> = {};
     const byCard: Record<string, number> = {};
+    const byCategory: Record<string, Record<string, number>> = {};
 
     for (const pi of purchaseInstallments) {
       if (pi.referenceYear !== m.year || pi.referenceMonth !== m.month) continue;
@@ -124,6 +144,7 @@ export async function getMonthlyTimeline(
       addTo(coupleTotals, currency, pi.valueCents);
       addTo(breakdownPurchases, currency, share);
       addTo(byCard, pi.purchase.cardId, share);
+      addToCategory(byCategory, pi.purchase.category, currency, share);
     }
 
     for (const fi of fixedExpenseInstallments) {
@@ -133,6 +154,7 @@ export async function getMonthlyTimeline(
       addTo(myTotals, currency, share);
       addTo(coupleTotals, currency, fi.valueCents);
       addTo(breakdownFixedExpenses, currency, share);
+      addToCategory(byCategory, fi.fixedExpense.category, currency, share);
     }
 
     return {
@@ -145,6 +167,7 @@ export async function getMonthlyTimeline(
         fixedExpenses: breakdownFixedExpenses,
       },
       byCard,
+      byCategory,
     };
   });
 }

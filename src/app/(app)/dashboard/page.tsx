@@ -15,6 +15,7 @@ import {
   FIXED_EXPENSES_KEY,
   type MonthBarData,
 } from "@/components/month-timeline-chart";
+import { categoryLabel } from "@/lib/categories";
 
 export default async function DashboardPage() {
   const user = await requireUser();
@@ -86,6 +87,40 @@ export default async function DashboardPage() {
     new Set([...myCombined.ignoredCurrencies, ...coupleCombined.ignoredCurrencies])
   );
 
+  // Agrega byCategory de todos os meses do periodo (categoria -> moeda ->
+  // centavos), depois converte cada categoria pra BRL - mesmo raciocinio da
+  // legenda do month-timeline-chart.tsx (Story 1.11), mas por categoria em
+  // vez de por cartao, combinando compras e gastos fixos.
+  const categoryPeriodTotals: Record<string, Record<string, number>> = {};
+  for (const m of timeline) {
+    for (const [category, currencyMap] of Object.entries(m.byCategory)) {
+      const target = categoryPeriodTotals[category] ?? {};
+      for (const [currency, cents] of Object.entries(currencyMap)) {
+        target[currency] = (target[currency] ?? 0) + cents;
+      }
+      categoryPeriodTotals[category] = target;
+    }
+  }
+
+  const categoryBreakdown = await Promise.all(
+    Object.entries(categoryPeriodTotals).map(async ([category, currencyMap]) => {
+      const result = await getCombinedBRLTotal(currencyMap);
+      return { category, totalBRLCents: result.totalBRLCents };
+    })
+  );
+  const categoryGrandTotal = categoryBreakdown.reduce(
+    (sum, c) => sum + c.totalBRLCents,
+    0
+  );
+  const sortedCategoryBreakdown = categoryBreakdown
+    .filter((c) => c.totalBRLCents > 0)
+    .map((c) => ({
+      ...c,
+      percent:
+        categoryGrandTotal > 0 ? (c.totalBRLCents / categoryGrandTotal) * 100 : 0,
+    }))
+    .sort((a, b) => b.totalBRLCents - a.totalBRLCents);
+
   return (
     <main className="space-y-6 p-4">
       <div className="flex items-center justify-between">
@@ -125,6 +160,27 @@ export default async function DashboardPage() {
           </p>
         </div>
       </section>
+
+      {sortedCategoryBreakdown.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-sm font-medium text-muted-foreground">
+            Por categoria (≈ BRL, minha parte)
+          </h2>
+          <ul className="space-y-1">
+            {sortedCategoryBreakdown.map((c) => (
+              <li
+                key={c.category}
+                className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+              >
+                <span>{categoryLabel(c.category)}</span>
+                <span className="text-muted-foreground">
+                  {centsToDisplay(c.totalBRLCents, "BRL")} ({c.percent.toFixed(0)}%)
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section>
         <h2 className="mb-2 text-sm font-medium text-muted-foreground">

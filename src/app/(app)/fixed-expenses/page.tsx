@@ -2,11 +2,21 @@ import Link from "next/link";
 import { requireUser, getOtherUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
+import { categoryLabel, SUPPORTED_CATEGORIES } from "@/lib/categories";
 import { buttonVariants } from "@/components/ui/button";
+import { CategoryFilter } from "@/components/category-filter";
 import { ensureRollingInstallments } from "@/lib/actions/fixed-expense-actions";
 
-export default async function FixedExpensesPage() {
+export default async function FixedExpensesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ category?: string }>;
+}) {
   const user = await requireUser();
+  const { category: rawCategory } = await searchParams;
+  const category = SUPPORTED_CATEGORIES.some((c) => c.code === rawCategory)
+    ? rawCategory
+    : undefined;
 
   await ensureRollingInstallments();
 
@@ -14,6 +24,7 @@ export default async function FixedExpensesPage() {
     db.fixedExpense.findMany({
       where: {
         OR: [{ ownerUserId: user.userId }, { isShared: true }],
+        ...(category ? { category } : {}),
       },
       orderBy: { createdAt: "desc" },
     }),
@@ -29,9 +40,15 @@ export default async function FixedExpensesPage() {
         </Link>
       </div>
 
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <CategoryFilter />
+      </div>
+
       {fixedExpenses.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Nenhum gasto fixo registrado ainda.
+          {category
+            ? "Nenhum gasto fixo registrado com essa categoria ainda."
+            : "Nenhum gasto fixo registrado ainda."}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -58,6 +75,7 @@ export default async function FixedExpensesPage() {
                 </div>
                 <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
                   <span>
+                    {categoryLabel(fe.category)} ·{" "}
                     {fe.totalInstallments
                       ? `${fe.totalInstallments}x`
                       : "Indefinido"}

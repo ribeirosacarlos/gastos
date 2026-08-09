@@ -10,6 +10,7 @@ import {
   type FixedExpenseInput,
 } from "@/lib/validation/schemas";
 import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from "@/lib/money";
+import { SUPPORTED_CATEGORIES, DEFAULT_CATEGORY } from "@/lib/categories";
 import { CurrencyInput } from "@/components/currency-input";
 import { Button } from "@/components/ui/button";
 
@@ -45,6 +46,7 @@ export function NewFixedExpenseForm({
       startMonth: month,
       totalInstallments: null,
       isShared: false,
+      category: DEFAULT_CATEGORY,
     },
   });
 
@@ -102,6 +104,23 @@ export function NewFixedExpenseForm({
           {SUPPORTED_CURRENCIES.map((c) => (
             <option key={c.code} value={c.code}>
               {c.label} ({c.code})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-1">
+        <label htmlFor="category" className="text-sm font-medium">
+          Categoria
+        </label>
+        <select
+          id="category"
+          className="w-full rounded-md border px-3 py-2 text-sm"
+          {...register("category")}
+        >
+          {SUPPORTED_CATEGORIES.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.label}
             </option>
           ))}
         </select>

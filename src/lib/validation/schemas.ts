@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SUPPORTED_CURRENCIES } from "@/lib/money";
+import { SUPPORTED_CATEGORIES } from "@/lib/categories";
 
 export const loginSchema = z.object({
   username: z.string().min(1, "Informe o usuário"),
@@ -9,6 +10,11 @@ export const loginSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 
 const supportedCurrencyCodes = SUPPORTED_CURRENCIES.map((c) => c.code) as [
+  string,
+  ...string[],
+];
+
+const supportedCategoryCodes = SUPPORTED_CATEGORIES.map((c) => c.code) as [
   string,
   ...string[],
 ];
@@ -58,6 +64,9 @@ export const purchaseSchema = z.object({
     .int("Número de parcelas deve ser inteiro")
     .min(1, "Mínimo de 1 parcela"),
   isShared: z.coerce.boolean(),
+  category: z.enum(supportedCategoryCodes, {
+    message: "Categoria não suportada",
+  }),
 });
 
 export type PurchaseInput = z.infer<typeof purchaseSchema>;
@@ -84,6 +93,9 @@ export const fixedExpenseSchema = z.object({
     .optional()
     .nullable(),
   isShared: z.coerce.boolean(),
+  category: z.enum(supportedCategoryCodes, {
+    message: "Categoria não suportada",
+  }),
 });
 
 export type FixedExpenseInput = z.infer<typeof fixedExpenseSchema>;

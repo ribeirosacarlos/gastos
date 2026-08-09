@@ -16,6 +16,7 @@ import { InstallmentPreviewTable } from "@/components/installment-preview-table"
 import { Button } from "@/components/ui/button";
 import { centsToDisplay } from "@/lib/money";
 import { getContrastTextColor } from "@/lib/utils";
+import { SUPPORTED_CATEGORIES, DEFAULT_CATEGORY } from "@/lib/categories";
 
 interface CardOption {
   id: string;
@@ -67,6 +68,7 @@ export function SimulateForm({
       purchaseDate: new Date(todayIsoDate()),
       installmentsCount: 1,
       isShared: false,
+      category: DEFAULT_CATEGORY,
     },
   });
 
@@ -172,6 +174,23 @@ export function SimulateForm({
             className="w-full rounded-md border px-3 py-2 text-sm"
             {...register("description", { required: true })}
           />
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor="category" className="text-sm font-medium">
+            Categoria
+          </label>
+          <select
+            id="category"
+            className="w-full rounded-md border px-3 py-2 text-sm"
+            {...register("category")}
+          >
+            {SUPPORTED_CATEGORIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="space-y-1">

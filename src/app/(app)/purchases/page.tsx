@@ -2,21 +2,29 @@ import Link from "next/link";
 import { requireUser, getOtherUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
+import { categoryLabel, SUPPORTED_CATEGORIES } from "@/lib/categories";
 import { buttonVariants } from "@/components/ui/button";
+import { CategoryFilter } from "@/components/category-filter";
 
 export default async function PurchasesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cardId?: string }>;
+  searchParams: Promise<{ cardId?: string; category?: string }>;
 }) {
   const user = await requireUser();
-  const { cardId } = await searchParams;
+  const { cardId, category: rawCategory } = await searchParams;
+  // Categoria invalida na URL (editada a mao, ou removida de
+  // SUPPORTED_CATEGORIES no futuro) e ignorada, nao filtra pra lista vazia.
+  const category = SUPPORTED_CATEGORIES.some((c) => c.code === rawCategory)
+    ? rawCategory
+    : undefined;
 
   const [purchases, otherUser, filterCard] = await Promise.all([
     db.purchase.findMany({
       where: {
         OR: [{ ownerUserId: user.userId }, { isShared: true }],
         ...(cardId ? { cardId } : {}),
+        ...(category ? { category } : {}),
       },
       include: { card: true },
       orderBy: { createdAt: "desc" },
@@ -34,16 +42,27 @@ export default async function PurchasesPage({
         </Link>
       </div>
 
-      {filterCard && (
-        <p className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <CategoryFilter />
+      </div>
+
+      {(filterCard || category) && (
+        <p className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           Filtrando por{" "}
-          <span className="flex items-center gap-1.5 font-medium text-foreground">
-            <span
-              className="inline-block h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: filterCard.color }}
-            />
-            {filterCard.name}
-          </span>
+          {filterCard && (
+            <span className="flex items-center gap-1.5 font-medium text-foreground">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: filterCard.color }}
+              />
+              {filterCard.name}
+            </span>
+          )}
+          {category && (
+            <span className="font-medium text-foreground">
+              {categoryLabel(category)}
+            </span>
+          )}
           <Link href="/purchases" className="underline">
             limpar
           </Link>
@@ -52,8 +71,8 @@ export default async function PurchasesPage({
 
       {purchases.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {filterCard
-            ? "Nenhuma compra registrada nesse cartão ainda."
+          {filterCard || category
+            ? "Nenhuma compra registrada com esse filtro ainda."
             : "Nenhuma compra registrada ainda."}
         </p>
       ) : (
@@ -73,7 +92,9 @@ export default async function PurchasesPage({
                   )}
                 </div>
                 <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
-                  <span>{purchase.card.name}</span>
+                  <span>
+                    {purchase.card.name} · {categoryLabel(purchase.category)}
+                  </span>
                   <span>
                     {centsToDisplay(purchase.totalCents, purchase.card.currency)}{" "}
                     em {purchase.installmentsCount}x

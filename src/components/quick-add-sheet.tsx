@@ -16,6 +16,7 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { getContrastTextColor } from "@/lib/utils";
+import { SUPPORTED_CATEGORIES, DEFAULT_CATEGORY } from "@/lib/categories";
 
 interface CardOption {
   id: string;
@@ -46,6 +47,7 @@ function defaultValues(initialCardId: string): PurchaseInput {
     purchaseDate: new Date(todayIsoDate()),
     installmentsCount: 1,
     isShared: false,
+    category: DEFAULT_CATEGORY,
   };
 }
 
@@ -218,6 +220,23 @@ export function QuickAddSheet({
 
             {showMoreOptions && (
               <div className="space-y-4 rounded-md border p-3">
+                <div className="space-y-1">
+                  <label htmlFor="qa-category" className="text-sm font-medium">
+                    Categoria
+                  </label>
+                  <select
+                    id="qa-category"
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    {...register("category")}
+                  >
+                    {SUPPORTED_CATEGORIES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="space-y-1">
                   <label
                     htmlFor="qa-installmentsCount"

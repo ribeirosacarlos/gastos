@@ -54,6 +54,9 @@ model Purchase {
   totalCents        Int
   purchaseDate      DateTime
   installmentsCount Int
+  // Codigo da categoria, string livre (nao enum) - ver SUPPORTED_CATEGORIES
+  // em lib/categories.ts (Story 1.13)
+  category          String   @default("other")
   // isShared=true -> ownerUserId deve ser NULL (conta 50/50 pros dois)
   // isShared=false -> ownerUserId obrigatorio (conta 100% pro dono)
   // Invariante validada na camada de aplicacao (Server Actions), Prisma/SQLite
@@ -87,6 +90,9 @@ model FixedExpense {
   valueCents  Int
   // Codigo ISO 4217, default BRL. Sem cartao associado, entao carrega a propria moeda.
   currency    String   @default("BRL")
+  // Codigo da categoria, string livre - ver SUPPORTED_CATEGORIES em
+  // lib/categories.ts (Story 1.13)
+  category    String   @default("other")
   startYear   Int
   startMonth  Int
   // null = recorrente indefinido (ex. aluguel); numero = quantidade fixa de parcelas
