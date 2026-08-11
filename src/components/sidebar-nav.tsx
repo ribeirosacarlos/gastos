@@ -9,6 +9,7 @@ import {
   Repeat,
   Calculator,
   ArrowLeftRight,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { href: "/purchases", label: "Compras", icon: ShoppingCart },
   { href: "/fixed-expenses", label: "Fixos", icon: Repeat },
   { href: "/simulate", label: "Simular", icon: Calculator },
+  { href: "/categories", label: "Categorias", icon: Tag },
   { href: "/settings/currencies", label: "Câmbio", icon: ArrowLeftRight },
 ];
 

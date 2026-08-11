@@ -17,6 +17,7 @@ function currentYearMonth(): YearMonth {
 export interface CardLimit {
   cardId: string;
   name: string;
+  color: string;
   currency: string;
   limitCents: number;
   usedCents: number;
@@ -50,6 +51,7 @@ export async function getCardLimits(): Promise<CardLimit[]> {
     return {
       cardId: card.id,
       name: card.name,
+      color: card.color,
       currency: card.currency,
       limitCents: card.limitCents,
       usedCents,
@@ -113,6 +115,7 @@ export async function getMonthlyTimeline(
         OR: monthFilter,
         purchase: {
           OR: [{ ownerUserId: user.userId }, { isShared: true }],
+          isActive: true,
         },
       },
       include: { purchase: { include: { card: true } } },
@@ -122,6 +125,7 @@ export async function getMonthlyTimeline(
         OR: monthFilter,
         fixedExpense: {
           OR: [{ ownerUserId: user.userId }, { isShared: true }],
+          isActive: true,
         },
       },
       include: { fixedExpense: true },

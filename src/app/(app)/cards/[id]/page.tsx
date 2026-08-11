@@ -76,7 +76,7 @@ export default async function CardDetailPage({
           >
             Editar
           </Link>
-          <ArchiveCardButton cardId={card.id} />
+          <ArchiveCardButton cardId={card.id} redirectTo="/cards" />
         </div>
       )}
     </main>

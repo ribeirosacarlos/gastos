@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { centsToDisplay } from "@/lib/money";
+import { buttonVariants } from "@/components/ui/button";
+import { ArchiveCardButton } from "@/components/archive-card-button";
 
 export interface CardListItem {
   id: string;
@@ -85,11 +87,8 @@ export function CardList({ cards }: { cards: CardListItem[] }) {
 
       <ul className="space-y-2">
         {sortedCards.map((card) => (
-          <li key={card.id}>
-            <Link
-              href={`/cards/${card.id}`}
-              className="block rounded-lg border p-4 hover:bg-accent"
-            >
+          <li key={card.id} className="rounded-lg border p-4">
+            <Link href={`/cards/${card.id}`} className="block hover:opacity-80">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 font-medium">
                   <span
@@ -111,6 +110,15 @@ export function CardList({ cards }: { cards: CardListItem[] }) {
                 </span>
               </div>
             </Link>
+            <div className="mt-3 flex items-center gap-2">
+              <Link
+                href={`/cards/${card.id}/edit`}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                Editar
+              </Link>
+              <ArchiveCardButton cardId={card.id} size="sm" />
+            </div>
           </li>
         ))}
       </ul>

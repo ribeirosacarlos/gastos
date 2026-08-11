@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { requireUser, getOtherUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
 import { InstallmentPreviewTable } from "@/components/installment-preview-table";
 import { DeactivateFixedExpenseButton } from "@/components/deactivate-fixed-expense-button";
 import { BackLink } from "@/components/back-link";
+import { buttonVariants } from "@/components/ui/button";
 import { toggleFixedExpenseInstallmentPaid } from "@/lib/actions/fixed-expense-actions";
 
 export default async function FixedExpenseDetailPage({
@@ -65,8 +67,17 @@ export default async function FixedExpenseDetailPage({
       />
 
       {fixedExpense.isActive && (
-        <div className="mt-6">
-          <DeactivateFixedExpenseButton fixedExpenseId={fixedExpense.id} />
+        <div className="mt-6 flex items-center gap-2">
+          <Link
+            href={`/fixed-expenses/${fixedExpense.id}/edit`}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            Editar
+          </Link>
+          <DeactivateFixedExpenseButton
+            fixedExpenseId={fixedExpense.id}
+            redirectTo="/fixed-expenses"
+          />
         </div>
       )}
     </main>

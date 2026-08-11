@@ -16,7 +16,9 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { getContrastTextColor } from "@/lib/utils";
-import { SUPPORTED_CATEGORIES, DEFAULT_CATEGORY } from "@/lib/categories";
+import { DEFAULT_CATEGORY } from "@/lib/categories";
+import { CategoryCombobox } from "@/components/category-combobox";
+import type { CategoryOption } from "@/lib/actions/category-actions";
 
 interface CardOption {
   id: string;
@@ -29,6 +31,7 @@ interface QuickAddSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   cards: CardOption[];
+  categories: CategoryOption[];
   defaultCardId?: string;
   otherUserName?: string;
 }
@@ -37,6 +40,10 @@ const DEFAULT_DESCRIPTION = "Gasto rápido";
 
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function toIsoDate(date: Date): string {
+  return new Date(date).toISOString().slice(0, 10);
 }
 
 function defaultValues(initialCardId: string): PurchaseInput {
@@ -55,6 +62,7 @@ export function QuickAddSheet({
   open,
   onOpenChange,
   cards,
+  categories,
   defaultCardId,
   otherUserName,
 }: QuickAddSheetProps) {
@@ -183,15 +191,25 @@ export function QuickAddSheet({
               <label htmlFor="qa-purchaseDate" className="text-sm font-medium">
                 Data
               </label>
-              <input
-                id="qa-purchaseDate"
-                type="date"
-                defaultValue={todayIsoDate()}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-                {...register("purchaseDate", {
-                  valueAsDate: true,
-                  required: true,
-                })}
+              <Controller
+                control={control}
+                name="purchaseDate"
+                render={({ field }) => (
+                  <input
+                    id="qa-purchaseDate"
+                    type="date"
+                    required
+                    value={field.value ? toIsoDate(field.value) : ""}
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    onChange={(e) =>
+                      field.onChange(
+                        e.target.value
+                          ? new Date(`${e.target.value}T00:00:00.000Z`)
+                          : undefined
+                      )
+                    }
+                  />
+                )}
               />
             </div>
 
@@ -210,6 +228,24 @@ export function QuickAddSheet({
               />
             </div>
 
+            <div className="space-y-1">
+              <label htmlFor="qa-category" className="text-sm font-medium">
+                Categoria
+              </label>
+              <Controller
+                control={control}
+                name="category"
+                render={({ field }) => (
+                  <CategoryCombobox
+                    id="qa-category"
+                    value={field.value}
+                    onChange={field.onChange}
+                    categories={categories}
+                  />
+                )}
+              />
+            </div>
+
             <button
               type="button"
               className="text-sm text-muted-foreground underline"
@@ -220,23 +256,6 @@ export function QuickAddSheet({
 
             {showMoreOptions && (
               <div className="space-y-4 rounded-md border p-3">
-                <div className="space-y-1">
-                  <label htmlFor="qa-category" className="text-sm font-medium">
-                    Categoria
-                  </label>
-                  <select
-                    id="qa-category"
-                    className="w-full rounded-md border px-3 py-2 text-sm"
-                    {...register("category")}
-                  >
-                    {SUPPORTED_CATEGORIES.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 <div className="space-y-1">
                   <label
                     htmlFor="qa-installmentsCount"

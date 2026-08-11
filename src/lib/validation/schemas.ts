@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { SUPPORTED_CURRENCIES } from "@/lib/money";
-import { SUPPORTED_CATEGORIES } from "@/lib/categories";
 
 export const loginSchema = z.object({
   username: z.string().min(1, "Informe o usuário"),
@@ -14,10 +13,11 @@ const supportedCurrencyCodes = SUPPORTED_CURRENCIES.map((c) => c.code) as [
   ...string[],
 ];
 
-const supportedCategoryCodes = SUPPORTED_CATEGORIES.map((c) => c.code) as [
-  string,
-  ...string[],
-];
+export const categorySchema = z.object({
+  name: z.string().trim().min(1, "Informe o nome da categoria"),
+});
+
+export type CategoryInput = z.infer<typeof categorySchema>;
 
 export const cardSchema = z.object({
   name: z.string().min(1, "Informe o nome do cartão"),
@@ -64,12 +64,19 @@ export const purchaseSchema = z.object({
     .int("Número de parcelas deve ser inteiro")
     .min(1, "Mínimo de 1 parcela"),
   isShared: z.coerce.boolean(),
-  category: z.enum(supportedCategoryCodes, {
-    message: "Categoria não suportada",
-  }),
+  // Validado contra a tabela Category na action (mesmo padrao de cardId),
+  // nao da pra usar z.enum aqui porque a lista e dinamica.
+  category: z.string().min(1, "Selecione uma categoria"),
 });
 
 export type PurchaseInput = z.infer<typeof purchaseSchema>;
+
+// Mesmos campos de purchaseSchema - a diferenca entre criar e editar fica na
+// action (updatePurchase bloqueia regeneracao de installments se ja houver
+// parcela paga; ver Dev Notes da Story 1.14), nao no shape validado.
+export const updatePurchaseSchema = purchaseSchema;
+
+export type UpdatePurchaseInput = z.infer<typeof updatePurchaseSchema>;
 
 export const fixedExpenseSchema = z.object({
   description: z.string().min(1, "Informe a descrição"),
@@ -93,12 +100,16 @@ export const fixedExpenseSchema = z.object({
     .optional()
     .nullable(),
   isShared: z.coerce.boolean(),
-  category: z.enum(supportedCategoryCodes, {
-    message: "Categoria não suportada",
-  }),
+  category: z.string().min(1, "Selecione uma categoria"),
 });
 
 export type FixedExpenseInput = z.infer<typeof fixedExpenseSchema>;
+
+// Mesmos campos de fixedExpenseSchema - mesma logica de updatePurchaseSchema:
+// a guarda de parcela paga fica na action, nao no shape validado.
+export const updateFixedExpenseSchema = fixedExpenseSchema;
+
+export type UpdateFixedExpenseInput = z.infer<typeof updateFixedExpenseSchema>;
 
 const nonBrlCurrencyCodes = SUPPORTED_CURRENCIES.filter(
   (c) => c.code !== "BRL"

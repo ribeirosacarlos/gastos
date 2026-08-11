@@ -1,35 +1,40 @@
 "use client";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import type { CategoryOption } from "@/lib/actions/category-actions";
 
-// Select que atualiza o ?category= na URL preservando os outros query
-// params ja presentes (ex. ?cardId=), sem precisar de um <form> completo.
-export function CategoryFilter({ categories }: { categories: CategoryOption[] }) {
+export interface CardFilterOption {
+  id: string;
+  name: string;
+  color: string;
+}
+
+// Select que atualiza o ?cardId= na URL preservando os outros query params
+// ja presentes (ex. ?category=), mesmo padrao de category-filter.tsx.
+export function CardFilter({ cards }: { cards: CardFilterOption[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const currentCategory = searchParams.get("category") ?? "";
+  const currentCardId = searchParams.get("cardId") ?? "";
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const params = new URLSearchParams(searchParams.toString());
     if (e.target.value) {
-      params.set("category", e.target.value);
+      params.set("cardId", e.target.value);
     } else {
-      params.delete("category");
+      params.delete("cardId");
     }
     router.push(`${pathname}?${params.toString()}`);
   }
 
   return (
     <select
-      value={currentCategory}
+      value={currentCardId}
       onChange={handleChange}
       className="rounded-md border px-2 py-1 text-sm"
     >
-      <option value="">Todas as categorias</option>
-      {categories.map((c) => (
+      <option value="">Todos os cartões</option>
+      {cards.map((c) => (
         <option key={c.id} value={c.id}>
           {c.name}
         </option>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { QuickAddSheet } from "@/components/quick-add-sheet";
+import type { CategoryOption } from "@/lib/actions/category-actions";
 
 interface CardOption {
   id: string;
@@ -13,12 +14,14 @@ interface CardOption {
 
 interface QuickAddFabProps {
   cards: CardOption[];
+  categories: CategoryOption[];
   defaultCardId?: string;
   otherUserName?: string;
 }
 
 export function QuickAddFab({
   cards,
+  categories,
   defaultCardId,
   otherUserName,
 }: QuickAddFabProps) {
@@ -38,6 +41,7 @@ export function QuickAddFab({
         open={open}
         onOpenChange={setOpen}
         cards={cards}
+        categories={categories}
         defaultCardId={defaultCardId}
         otherUserName={otherUserName}
       />

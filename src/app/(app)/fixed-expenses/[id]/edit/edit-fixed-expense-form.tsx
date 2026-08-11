@@ -4,86 +4,83 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch, Controller } from "react-hook-form";
 import { toast } from "sonner";
-import { createFixedExpense } from "@/lib/actions/fixed-expense-actions";
+import { updateFixedExpense } from "@/lib/actions/fixed-expense-actions";
 import {
-  fixedExpenseSchema,
-  type FixedExpenseInput,
+  updateFixedExpenseSchema,
+  type UpdateFixedExpenseInput,
 } from "@/lib/validation/schemas";
-import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from "@/lib/money";
-import { DEFAULT_CATEGORY } from "@/lib/categories";
+import { SUPPORTED_CURRENCIES } from "@/lib/money";
 import { CurrencyInput } from "@/components/currency-input";
 import { CategoryCombobox } from "@/components/category-combobox";
 import { Button } from "@/components/ui/button";
 import type { CategoryOption } from "@/lib/actions/category-actions";
 
-function currentYearMonth() {
-  const now = new Date();
-  return { year: now.getFullYear(), month: now.getMonth() + 1 };
-}
-
-interface NewFixedExpenseFormProps {
+interface EditFixedExpenseFormProps {
+  fixedExpenseId: string;
   categories: CategoryOption[];
+  hasPaidInstallment: boolean;
   otherUserName?: string;
+  defaultValues: UpdateFixedExpenseInput;
 }
 
-export function NewFixedExpenseForm({
+export function EditFixedExpenseForm({
+  fixedExpenseId,
   categories,
+  hasPaidInstallment,
   otherUserName,
-}: NewFixedExpenseFormProps) {
+  defaultValues,
+}: EditFixedExpenseFormProps) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
-  const [isIndefinite, setIsIndefinite] = useState(true);
-
-  const { year, month } = currentYearMonth();
+  const [isIndefinite, setIsIndefinite] = useState(
+    defaultValues.totalInstallments == null
+  );
 
   const {
     register,
     handleSubmit,
     control,
     formState: { isSubmitting },
-  } = useForm<FixedExpenseInput>({
-    defaultValues: {
-      description: "",
-      valueCents: 0,
-      currency: DEFAULT_CURRENCY,
-      startYear: year,
-      startMonth: month,
-      totalInstallments: null,
-      isShared: false,
-      category: DEFAULT_CATEGORY,
-    },
-  });
+  } = useForm<UpdateFixedExpenseInput>({ defaultValues });
 
   const currency = useWatch({ control, name: "currency" });
   const isShared = useWatch({ control, name: "isShared" });
 
-  async function onSubmit(values: FixedExpenseInput) {
+  async function onSubmit(values: UpdateFixedExpenseInput) {
     setServerError(null);
 
-    const payload: FixedExpenseInput = {
+    const payload: UpdateFixedExpenseInput = {
       ...values,
       totalInstallments: isIndefinite ? null : values.totalInstallments,
     };
 
-    const parsed = fixedExpenseSchema.safeParse(payload);
+    const parsed = updateFixedExpenseSchema.safeParse(payload);
     if (!parsed.success) {
       setServerError(parsed.error.issues[0]?.message ?? "Dados inválidos.");
       return;
     }
 
-    const result = await createFixedExpense(parsed.data);
+    const result = await updateFixedExpense(fixedExpenseId, parsed.data);
     if (result.error) {
       setServerError(result.error);
       return;
     }
 
-    toast.success("Gasto fixo criado.");
-    router.push("/fixed-expenses");
+    toast.success("Gasto fixo atualizado.");
+    router.push(`/fixed-expenses/${fixedExpenseId}`);
     router.refresh();
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      {hasPaidInstallment && (
+        <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          Este gasto fixo já tem parcela paga: valor, nº de parcelas e
+          mês/ano inicial não podem ser alterados. Descrição, categoria,
+          moeda e compartilhamento continuam editáveis.
+        </p>
+      )}
+
       <div className="space-y-1">
         <label htmlFor="description" className="text-sm font-medium">
           Descrição
@@ -144,6 +141,7 @@ export function NewFixedExpenseForm({
               currency={currency}
               value={field.value}
               onChange={field.onChange}
+              disabled={hasPaidInstallment}
             />
           )}
         />
@@ -159,7 +157,8 @@ export function NewFixedExpenseForm({
             type="number"
             min={1}
             max={12}
-            className="w-full rounded-md border px-3 py-2 text-sm"
+            disabled={hasPaidInstallment}
+            className="w-full rounded-md border px-3 py-2 text-sm disabled:opacity-50"
             {...register("startMonth", {
               valueAsNumber: true,
               required: true,
@@ -174,7 +173,8 @@ export function NewFixedExpenseForm({
           <input
             id="startYear"
             type="number"
-            className="w-full rounded-md border px-3 py-2 text-sm"
+            disabled={hasPaidInstallment}
+            className="w-full rounded-md border px-3 py-2 text-sm disabled:opacity-50"
             {...register("startYear", {
               valueAsNumber: true,
               required: true,
@@ -187,6 +187,7 @@ export function NewFixedExpenseForm({
         <input
           type="checkbox"
           checked={isIndefinite}
+          disabled={hasPaidInstallment}
           onChange={(e) => setIsIndefinite(e.target.checked)}
         />
         Indefinido (sem data pra acabar, ex. aluguel)
@@ -201,7 +202,8 @@ export function NewFixedExpenseForm({
             id="totalInstallments"
             type="number"
             min={1}
-            className="w-full rounded-md border px-3 py-2 text-sm"
+            disabled={hasPaidInstallment}
+            className="w-full rounded-md border px-3 py-2 text-sm disabled:opacity-50"
             {...register("totalInstallments", {
               valueAsNumber: true,
             })}

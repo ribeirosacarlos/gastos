@@ -1,9 +1,12 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { requireUser, getOtherUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
 import { InstallmentPreviewTable } from "@/components/installment-preview-table";
 import { BackLink } from "@/components/back-link";
+import { buttonVariants } from "@/components/ui/button";
+import { DeletePurchaseButton } from "@/components/delete-purchase-button";
 import { toggleInstallmentPaid } from "@/lib/actions/purchase-actions";
 
 export default async function PurchaseDetailPage({
@@ -56,6 +59,16 @@ export default async function PurchaseDetailPage({
         currency={purchase.card.currency}
         onTogglePaid={toggleInstallmentPaid}
       />
+
+      <div className="mt-6 flex items-center gap-2">
+        <Link
+          href={`/purchases/${purchase.id}/edit`}
+          className={buttonVariants({ variant: "outline" })}
+        >
+          Editar
+        </Link>
+        <DeletePurchaseButton purchaseId={purchase.id} redirectTo="/purchases" />
+      </div>
     </main>
   );
 }

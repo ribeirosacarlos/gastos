@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
 import { ensureRollingInstallments } from "@/lib/actions/fixed-expense-actions";
 import {
@@ -15,18 +16,19 @@ import {
   FIXED_EXPENSES_KEY,
   type MonthBarData,
 } from "@/components/month-timeline-chart";
-import { categoryLabel } from "@/lib/categories";
 
 export default async function DashboardPage() {
   const user = await requireUser();
 
   await ensureRollingInstallments();
 
-  const [cardLimits, timeline, cardColors] = await Promise.all([
+  const [cardLimits, timeline, cardColors, categories] = await Promise.all([
     getCardLimits(),
     getMonthlyTimeline(),
     getActiveCardColors(),
+    db.category.findMany({ select: { id: true, name: true } }),
   ]);
+  const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
 
   const monthBars: MonthBarData[] = await Promise.all(
     timeline.map(async (m) => {
@@ -172,7 +174,7 @@ export default async function DashboardPage() {
                 key={c.category}
                 className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
               >
-                <span>{categoryLabel(c.category)}</span>
+                <span>{categoryMap.get(c.category) ?? c.category}</span>
                 <span className="text-muted-foreground">
                   {centsToDisplay(c.totalBRLCents, "BRL")} ({c.percent.toFixed(0)}%)
                 </span>
@@ -191,7 +193,7 @@ export default async function DashboardPage() {
             Nenhum cartão ativo ainda.
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
             {cardLimits.map((card) => (
               <LimitProgressBar key={card.cardId} card={card} />
             ))}

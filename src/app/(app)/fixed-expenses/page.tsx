@@ -2,9 +2,9 @@ import Link from "next/link";
 import { requireUser, getOtherUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
-import { categoryLabel, SUPPORTED_CATEGORIES } from "@/lib/categories";
 import { buttonVariants } from "@/components/ui/button";
 import { CategoryFilter } from "@/components/category-filter";
+import { DeactivateFixedExpenseButton } from "@/components/deactivate-fixed-expense-button";
 import { ensureRollingInstallments } from "@/lib/actions/fixed-expense-actions";
 
 export default async function FixedExpensesPage({
@@ -14,9 +14,13 @@ export default async function FixedExpensesPage({
 }) {
   const user = await requireUser();
   const { category: rawCategory } = await searchParams;
-  const category = SUPPORTED_CATEGORIES.some((c) => c.code === rawCategory)
-    ? rawCategory
-    : undefined;
+
+  const allCategories = await db.category.findMany({
+    select: { id: true, name: true, isActive: true },
+  });
+  const categoryMap = new Map(allCategories.map((c) => [c.id, c.name]));
+  const activeCategories = allCategories.filter((c) => c.isActive);
+  const category = categoryMap.has(rawCategory ?? "") ? rawCategory : undefined;
 
   await ensureRollingInstallments();
 
@@ -24,6 +28,7 @@ export default async function FixedExpensesPage({
     db.fixedExpense.findMany({
       where: {
         OR: [{ ownerUserId: user.userId }, { isShared: true }],
+        isActive: true,
         ...(category ? { category } : {}),
       },
       orderBy: { createdAt: "desc" },
@@ -41,7 +46,7 @@ export default async function FixedExpensesPage({
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <CategoryFilter />
+        <CategoryFilter categories={activeCategories} />
       </div>
 
       {fixedExpenses.length === 0 ? (
@@ -53,29 +58,22 @@ export default async function FixedExpensesPage({
       ) : (
         <ul className="space-y-2">
           {fixedExpenses.map((fe) => (
-            <li key={fe.id}>
+            <li key={fe.id} className="rounded-lg border p-4">
               <Link
                 href={`/fixed-expenses/${fe.id}`}
-                className="block rounded-lg border p-4 hover:bg-accent"
+                className="block hover:opacity-80"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{fe.description}</span>
-                  <div className="flex gap-1">
-                    {fe.isShared && (
-                      <span className="rounded bg-muted px-2 py-0.5 text-xs">
-                        Compartilhada{otherUser ? ` com ${otherUser.name}` : ""}
-                      </span>
-                    )}
-                    {!fe.isActive && (
-                      <span className="rounded bg-muted px-2 py-0.5 text-xs">
-                        Inativa
-                      </span>
-                    )}
-                  </div>
+                  {fe.isShared && (
+                    <span className="rounded bg-muted px-2 py-0.5 text-xs">
+                      Compartilhada{otherUser ? ` com ${otherUser.name}` : ""}
+                    </span>
+                  )}
                 </div>
                 <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
                   <span>
-                    {categoryLabel(fe.category)} ·{" "}
+                    {categoryMap.get(fe.category) ?? fe.category} ·{" "}
                     {fe.totalInstallments
                       ? `${fe.totalInstallments}x`
                       : "Indefinido"}
@@ -83,6 +81,15 @@ export default async function FixedExpensesPage({
                   <span>{centsToDisplay(fe.valueCents, fe.currency)}</span>
                 </div>
               </Link>
+              <div className="mt-3 flex items-center gap-2">
+                <Link
+                  href={`/fixed-expenses/${fe.id}/edit`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Editar
+                </Link>
+                <DeactivateFixedExpenseButton fixedExpenseId={fe.id} size="sm" />
+              </div>
             </li>
           ))}
         </ul>

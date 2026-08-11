@@ -3,43 +3,39 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { archiveCard } from "@/lib/actions/card-actions";
+import { deletePurchase } from "@/lib/actions/purchase-actions";
 import { Button } from "@/components/ui/button";
 import type { buttonVariants } from "@/components/ui/button";
 import type { VariantProps } from "class-variance-authority";
 
-interface ArchiveCardButtonProps
+interface DeletePurchaseButtonProps
   extends Pick<VariantProps<typeof buttonVariants>, "size"> {
-  cardId: string;
+  purchaseId: string;
   redirectTo?: string;
 }
 
-export function ArchiveCardButton({
-  cardId,
+export function DeletePurchaseButton({
+  purchaseId,
   redirectTo,
   size,
-}: ArchiveCardButtonProps) {
+}: DeletePurchaseButtonProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  function handleArchive() {
-    if (
-      !window.confirm(
-        "Excluir este cartão? As compras vinculadas a ele também serão excluídas. Essa ação não pode ser desfeita."
-      )
-    ) {
+  function handleDelete() {
+    if (!window.confirm("Excluir esta compra? Essa ação não pode ser desfeita.")) {
       return;
     }
 
     setError(null);
     startTransition(async () => {
-      const result = await archiveCard(cardId);
+      const result = await deletePurchase(purchaseId);
       if (result.error) {
         setError(result.error);
         return;
       }
-      toast.success("Cartão excluído.");
+      toast.success("Compra excluída.");
       if (redirectTo) {
         router.push(redirectTo);
       }
@@ -53,7 +49,7 @@ export function ArchiveCardButton({
         type="button"
         variant="destructive"
         size={size}
-        onClick={handleArchive}
+        onClick={handleDelete}
         disabled={isPending}
       >
         {isPending ? "Excluindo..." : "Excluir"}

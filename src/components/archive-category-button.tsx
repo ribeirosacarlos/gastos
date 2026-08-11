@@ -3,22 +3,22 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { archiveCard } from "@/lib/actions/card-actions";
+import { archiveCategory } from "@/lib/actions/category-actions";
 import { Button } from "@/components/ui/button";
 import type { buttonVariants } from "@/components/ui/button";
 import type { VariantProps } from "class-variance-authority";
 
-interface ArchiveCardButtonProps
+interface ArchiveCategoryButtonProps
   extends Pick<VariantProps<typeof buttonVariants>, "size"> {
-  cardId: string;
+  categoryId: string;
   redirectTo?: string;
 }
 
-export function ArchiveCardButton({
-  cardId,
+export function ArchiveCategoryButton({
+  categoryId,
   redirectTo,
   size,
-}: ArchiveCardButtonProps) {
+}: ArchiveCategoryButtonProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +26,7 @@ export function ArchiveCardButton({
   function handleArchive() {
     if (
       !window.confirm(
-        "Excluir este cartão? As compras vinculadas a ele também serão excluídas. Essa ação não pode ser desfeita."
+        "Excluir esta categoria? Compras e gastos fixos já lançados com ela continuam normalmente, ela só deixa de aparecer nas opções pra novos lançamentos."
       )
     ) {
       return;
@@ -34,12 +34,12 @@ export function ArchiveCardButton({
 
     setError(null);
     startTransition(async () => {
-      const result = await archiveCard(cardId);
+      const result = await archiveCategory(categoryId);
       if (result.error) {
         setError(result.error);
         return;
       }
-      toast.success("Cartão excluído.");
+      toast.success("Categoria excluída.");
       if (redirectTo) {
         router.push(redirectTo);
       }

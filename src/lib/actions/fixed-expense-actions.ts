@@ -6,7 +6,9 @@ import { requireUser } from "@/lib/auth";
 import { generateInstallmentMonths, type YearMonth } from "@/lib/dates";
 import {
   fixedExpenseSchema,
+  updateFixedExpenseSchema,
   type FixedExpenseInput,
+  type UpdateFixedExpenseInput,
 } from "@/lib/validation/schemas";
 
 // Ver Dev Notes da Story 1.6: numero concreto citado como exemplo no plano
@@ -53,12 +55,19 @@ export async function createFixedExpense(
     startMonth,
     totalInstallments,
     isShared,
+    category,
   } = parsed.data;
+
+  const categoryRecord = await db.category.findUnique({ where: { id: category } });
+  if (!categoryRecord) {
+    return { error: "Categoria inválida." };
+  }
 
   await db.$transaction(async (tx) => {
     const fixedExpense = await tx.fixedExpense.create({
       data: {
         description,
+        category,
         valueCents,
         currency,
         startYear,
@@ -189,6 +198,114 @@ export async function toggleFixedExpenseInstallmentPaid(
   });
 
   revalidatePath(`/fixed-expenses/${installment.fixedExpenseId}`);
+  return {};
+}
+
+export type UpdateFixedExpenseResult = { error?: string };
+
+// Mesma regra da Story 1.14 aplicada a compras (updatePurchase): descricao,
+// moeda, categoria e compartilhamento sao sempre editaveis; valor, numero de
+// parcelas e mes/ano inicial disparam regeneracao das installments, e so sao
+// aceitos se nenhuma installment ja estiver paga.
+export async function updateFixedExpense(
+  fixedExpenseId: string,
+  input: UpdateFixedExpenseInput
+): Promise<UpdateFixedExpenseResult> {
+  const user = await requireUser();
+
+  const fixedExpense = await db.fixedExpense.findUnique({
+    where: { id: fixedExpenseId },
+    include: { installments: true },
+  });
+
+  if (!fixedExpense) {
+    return { error: "Gasto fixo não encontrado." };
+  }
+
+  const visible =
+    fixedExpense.isShared || fixedExpense.ownerUserId === user.userId;
+  if (!visible) {
+    return { error: "Gasto fixo não encontrado." };
+  }
+
+  const parsed = updateFixedExpenseSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+
+  const {
+    description,
+    valueCents,
+    currency,
+    startYear,
+    startMonth,
+    totalInstallments,
+    isShared,
+    category,
+  } = parsed.data;
+
+  const categoryRecord = await db.category.findUnique({ where: { id: category } });
+  if (!categoryRecord) {
+    return { error: "Categoria inválida." };
+  }
+
+  const needsRegeneration =
+    valueCents !== fixedExpense.valueCents ||
+    (totalInstallments ?? null) !== fixedExpense.totalInstallments ||
+    startYear !== fixedExpense.startYear ||
+    startMonth !== fixedExpense.startMonth;
+
+  const hasPaidInstallment = fixedExpense.installments.some((i) => i.paid);
+
+  if (needsRegeneration && hasPaidInstallment) {
+    return {
+      error:
+        "Não é possível alterar valor, parcelas ou mês/ano inicial com parcelas já pagas. Exclua e recrie o gasto fixo.",
+    };
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.fixedExpense.update({
+      where: { id: fixedExpenseId },
+      data: {
+        description,
+        valueCents,
+        currency,
+        category,
+        startYear,
+        startMonth,
+        totalInstallments: totalInstallments ?? null,
+        isShared,
+        ownerUserId: isShared ? null : user.userId,
+      },
+    });
+
+    if (needsRegeneration) {
+      await tx.fixedExpenseInstallment.deleteMany({
+        where: { fixedExpenseId },
+      });
+
+      const months = totalInstallments
+        ? generateInstallmentMonths(
+            { year: startYear, month: startMonth },
+            totalInstallments
+          )
+        : rollingWindowMonths({ year: startYear, month: startMonth });
+
+      await tx.fixedExpenseInstallment.createMany({
+        data: months.map((month, i) => ({
+          fixedExpenseId,
+          installmentNumber: i + 1,
+          referenceYear: month.year,
+          referenceMonth: month.month,
+          valueCents,
+        })),
+      });
+    }
+  });
+
+  revalidatePath("/fixed-expenses");
+  revalidatePath(`/fixed-expenses/${fixedExpenseId}`);
   return {};
 }
 

@@ -1,5 +1,6 @@
 import { centsToDisplay } from "@/lib/money";
 import { Progress, ProgressTrack, ProgressIndicator } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
 import type { CardLimit } from "@/lib/actions/dashboard-actions";
 
 export function LimitProgressBar({ card }: { card: CardLimit }) {
@@ -11,8 +12,19 @@ export function LimitProgressBar({ card }: { card: CardLimit }) {
   return (
     <div className="rounded-lg border p-4">
       <div className="flex items-center justify-between text-sm font-medium">
-        <span>{card.name}</span>
-        <span className={isOverLimit ? "text-red-600" : "text-muted-foreground"}>
+        <span className="flex items-center gap-1.5 truncate">
+          <span
+            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: card.color }}
+          />
+          <span className="truncate">{card.name}</span>
+        </span>
+        <span
+          className={cn(
+            "shrink-0",
+            isOverLimit ? "text-red-600" : "text-muted-foreground"
+          )}
+        >
           {centsToDisplay(card.availableCents, card.currency)} disponível
         </span>
       </div>

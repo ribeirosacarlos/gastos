@@ -69,12 +69,22 @@ export async function archiveCard(cardId: string): Promise<ArchiveCardResult> {
     return { error: "Cartão não encontrado." };
   }
 
-  await db.card.update({
-    where: { id: cardId },
-    data: { isActive: false },
-  });
+  // Cascata logica: excluir o cartao tambem exclui (soft-delete) as compras
+  // ainda ativas vinculadas a ele - senao elas ficariam "orfas" mas
+  // continuariam contando nos totais/listagens (Story 1.14).
+  await db.$transaction([
+    db.purchase.updateMany({
+      where: { cardId, isActive: true },
+      data: { isActive: false },
+    }),
+    db.card.update({
+      where: { id: cardId },
+      data: { isActive: false },
+    }),
+  ]);
 
   revalidatePath("/cards");
   revalidatePath(`/cards/${cardId}`);
+  revalidatePath("/purchases");
   return {};
 }

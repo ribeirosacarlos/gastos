@@ -16,7 +16,9 @@ import { InstallmentPreviewTable } from "@/components/installment-preview-table"
 import { Button } from "@/components/ui/button";
 import { centsToDisplay } from "@/lib/money";
 import { getContrastTextColor } from "@/lib/utils";
-import { SUPPORTED_CATEGORIES, DEFAULT_CATEGORY } from "@/lib/categories";
+import { DEFAULT_CATEGORY } from "@/lib/categories";
+import { CategoryCombobox } from "@/components/category-combobox";
+import type { CategoryOption } from "@/lib/actions/category-actions";
 
 interface CardOption {
   id: string;
@@ -27,6 +29,7 @@ interface CardOption {
 
 interface SimulateFormProps {
   cards: CardOption[];
+  categories: CategoryOption[];
   defaultCardId?: string;
   otherUserName?: string;
 }
@@ -35,8 +38,13 @@ function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function toIsoDate(date: Date): string {
+  return new Date(date).toISOString().slice(0, 10);
+}
+
 export function SimulateForm({
   cards,
+  categories,
   defaultCardId,
   otherUserName,
 }: SimulateFormProps) {
@@ -180,17 +188,18 @@ export function SimulateForm({
           <label htmlFor="category" className="text-sm font-medium">
             Categoria
           </label>
-          <select
-            id="category"
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            {...register("category")}
-          >
-            {SUPPORTED_CATEGORIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.label}
-              </option>
-            ))}
-          </select>
+          <Controller
+            control={control}
+            name="category"
+            render={({ field }) => (
+              <CategoryCombobox
+                id="category"
+                value={field.value}
+                onChange={field.onChange}
+                categories={categories}
+              />
+            )}
+          />
         </div>
 
         <div className="space-y-1">
@@ -216,15 +225,25 @@ export function SimulateForm({
             <label htmlFor="purchaseDate" className="text-sm font-medium">
               Data da compra
             </label>
-            <input
-              id="purchaseDate"
-              type="date"
-              defaultValue={todayIsoDate()}
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              {...register("purchaseDate", {
-                valueAsDate: true,
-                required: true,
-              })}
+            <Controller
+              control={control}
+              name="purchaseDate"
+              render={({ field }) => (
+                <input
+                  id="purchaseDate"
+                  type="date"
+                  required
+                  value={field.value ? toIsoDate(field.value) : ""}
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  onChange={(e) =>
+                    field.onChange(
+                      e.target.value
+                        ? new Date(`${e.target.value}T00:00:00.000Z`)
+                        : undefined
+                    )
+                  }
+                />
+              )}
             />
           </div>
 

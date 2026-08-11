@@ -4,13 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch, Controller } from "react-hook-form";
 import { toast } from "sonner";
-import { createPurchase } from "@/lib/actions/purchase-actions";
-import { purchaseSchema, type PurchaseInput } from "@/lib/validation/schemas";
+import { updatePurchase } from "@/lib/actions/purchase-actions";
+import {
+  updatePurchaseSchema,
+  type UpdatePurchaseInput,
+} from "@/lib/validation/schemas";
 import { CurrencyInput } from "@/components/currency-input";
 import { CategoryCombobox } from "@/components/category-combobox";
 import { Button } from "@/components/ui/button";
 import { getContrastTextColor } from "@/lib/utils";
-import { DEFAULT_CATEGORY } from "@/lib/categories";
 import type { CategoryOption } from "@/lib/actions/category-actions";
 
 interface CardOption {
@@ -20,89 +22,72 @@ interface CardOption {
   color: string;
 }
 
-interface NewPurchaseFormProps {
+interface EditPurchaseFormProps {
+  purchaseId: string;
   cards: CardOption[];
   categories: CategoryOption[];
-  defaultCardId?: string;
+  hasPaidInstallment: boolean;
   otherUserName?: string;
+  defaultValues: UpdatePurchaseInput;
 }
 
-function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-// input type=date so aceita "yyyy-MM-dd" em UTC - toISOString cobre isso
-// direto ja que purchaseDate sempre e gravado como meia-noite UTC.
 function toIsoDate(date: Date): string {
   return new Date(date).toISOString().slice(0, 10);
 }
 
-export function NewPurchaseForm({
+export function EditPurchaseForm({
+  purchaseId,
   cards,
   categories,
-  defaultCardId,
+  hasPaidInstallment,
   otherUserName,
-}: NewPurchaseFormProps) {
+  defaultValues,
+}: EditPurchaseFormProps) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
-
-  const initialCardId =
-    (defaultCardId && cards.some((c) => c.id === defaultCardId)
-      ? defaultCardId
-      : cards[0]?.id) ?? "";
 
   const {
     register,
     handleSubmit,
     control,
     formState: { isSubmitting },
-  } = useForm<PurchaseInput>({
-    defaultValues: {
-      cardId: initialCardId,
-      description: "",
-      totalCents: 0,
-      purchaseDate: new Date(todayIsoDate()),
-      installmentsCount: 1,
-      isShared: false,
-      category: DEFAULT_CATEGORY,
-    },
-  });
+  } = useForm<UpdatePurchaseInput>({ defaultValues });
 
   const cardId = useWatch({ control, name: "cardId" });
   const selectedCard = cards.find((c) => c.id === cardId);
   const currency = selectedCard?.currency ?? "BRL";
   const isShared = useWatch({ control, name: "isShared" });
 
-  async function onSubmit(values: PurchaseInput) {
+  async function onSubmit(values: UpdatePurchaseInput) {
     setServerError(null);
 
-    const parsed = purchaseSchema.safeParse(values);
+    const parsed = updatePurchaseSchema.safeParse(values);
     if (!parsed.success) {
       setServerError(parsed.error.issues[0]?.message ?? "Dados inválidos.");
       return;
     }
 
-    const result = await createPurchase(parsed.data);
+    const result = await updatePurchase(purchaseId, parsed.data);
     if (result.error) {
       setServerError(result.error);
       return;
     }
 
-    toast.success("Compra registrada.");
-    router.push("/purchases");
+    toast.success("Compra atualizada.");
+    router.push(`/purchases/${purchaseId}`);
     router.refresh();
-  }
-
-  if (cards.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Você ainda não tem nenhum cartão ativo. Cadastre um cartão primeiro.
-      </p>
-    );
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      {hasPaidInstallment && (
+        <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          Esta compra já tem parcela paga: valor, nº de parcelas e data não
+          podem ser alterados. Descrição, categoria, cartão e compartilhamento
+          continuam editáveis.
+        </p>
+      )}
+
       <div className="space-y-1">
         <label htmlFor="cardId" className="text-sm font-medium">
           Cartão
@@ -177,6 +162,7 @@ export function NewPurchaseForm({
               currency={currency}
               value={field.value}
               onChange={field.onChange}
+              disabled={hasPaidInstallment}
             />
           )}
         />
@@ -196,7 +182,8 @@ export function NewPurchaseForm({
                 type="date"
                 required
                 value={field.value ? toIsoDate(field.value) : ""}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                disabled={hasPaidInstallment}
+                className="w-full rounded-md border px-3 py-2 text-sm disabled:opacity-50"
                 onChange={(e) =>
                   field.onChange(
                     e.target.value
@@ -217,7 +204,8 @@ export function NewPurchaseForm({
             id="installmentsCount"
             type="number"
             min={1}
-            className="w-full rounded-md border px-3 py-2 text-sm"
+            disabled={hasPaidInstallment}
+            className="w-full rounded-md border px-3 py-2 text-sm disabled:opacity-50"
             {...register("installmentsCount", {
               valueAsNumber: true,
               required: true,
