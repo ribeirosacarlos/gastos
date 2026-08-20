@@ -47,9 +47,23 @@ export function convertToBRL(cents: number, rateToBRL: number): number {
   return Math.round(cents * rateToBRL);
 }
 
-// Metade (arredondada pra baixo) de um valor compartilhado - a visibilidade
-// de quem pode ver a linha (propria ou compartilhada) e responsabilidade da
-// query, nao desta funcao.
+// Metade (arredondada pra baixo) de um valor compartilhado - usado so por
+// FixedExpense, que mantem o modelo binario isShared (fora do escopo da
+// divisao entre N participantes, ver Purchase/splitAmongParticipants).
 export function userShareCents(valueCents: number, isShared: boolean): number {
   return isShared ? Math.floor(valueCents / 2) : valueCents;
+}
+
+// Divide valueCents igualmente entre todos os participantes de uma compra,
+// sem perda de centavos (reusa splitValue). orderedUserIds[0] deve ser
+// sempre o dono da compra - e quem absorve o(s) centavo(s) de resto,
+// deterministicamente, em vez de depender da ordem de retorno do banco.
+// A visibilidade de quem pode ver a linha (dono ou participante) e
+// responsabilidade da query, nao desta funcao.
+export function splitAmongParticipants(
+  valueCents: number,
+  orderedUserIds: string[]
+): Record<string, number> {
+  const shares = splitValue(valueCents, orderedUserIds.length);
+  return Object.fromEntries(orderedUserIds.map((userId, i) => [userId, shares[i]]));
 }

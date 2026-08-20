@@ -12,6 +12,33 @@ import {
   type UpdatePurchaseInput,
 } from "@/lib/validation/schemas";
 
+// Valida additionalParticipantUserIds (dedupe, sem o proprio dono, todos
+// devem existir) e retorna a lista completa de participantes (dono
+// sempre primeiro - splitAmongParticipants depende dessa ordem pra
+// atribuir o resto dos centavos deterministicamente). Usado por
+// createPurchase e updatePurchase.
+async function resolveParticipantUserIds(
+  ownerUserId: string,
+  additionalParticipantUserIds: string[]
+): Promise<{ error: string } | { participantUserIds: string[] }> {
+  const additional = Array.from(new Set(additionalParticipantUserIds));
+
+  if (additional.includes(ownerUserId)) {
+    return { error: "Você já é participante por padrão da própria compra." };
+  }
+
+  if (additional.length > 0) {
+    const existingCount = await db.user.count({
+      where: { id: { in: additional } },
+    });
+    if (existingCount !== additional.length) {
+      return { error: "Participante inválido." };
+    }
+  }
+
+  return { participantUserIds: [ownerUserId, ...additional] };
+}
+
 export type CreatePurchaseResult = { error?: string };
 
 export async function createPurchase(
@@ -30,7 +57,7 @@ export async function createPurchase(
     totalCents,
     purchaseDate,
     installmentsCount,
-    isShared,
+    additionalParticipantUserIds,
     category,
   } = parsed.data;
 
@@ -43,6 +70,14 @@ export async function createPurchase(
   }
   if (!categoryRecord) {
     return { error: "Categoria inválida." };
+  }
+
+  const participants = await resolveParticipantUserIds(
+    user.userId,
+    additionalParticipantUserIds
+  );
+  if ("error" in participants) {
+    return { error: participants.error };
   }
 
   const firstMonth = firstInvoiceMonth(purchaseDate, card.closingDay);
@@ -58,8 +93,7 @@ export async function createPurchase(
         totalCents,
         purchaseDate,
         installmentsCount,
-        isShared,
-        ownerUserId: isShared ? null : user.userId,
+        ownerUserId: user.userId,
       },
     });
 
@@ -70,6 +104,13 @@ export async function createPurchase(
         referenceYear: month.year,
         referenceMonth: month.month,
         valueCents: values[i],
+      })),
+    });
+
+    await tx.purchaseParticipant.createMany({
+      data: participants.participantUserIds.map((userId) => ({
+        purchaseId: purchase.id,
+        userId,
       })),
     });
 
@@ -92,16 +133,16 @@ export async function toggleInstallmentPaid(
 
   const installment = await db.purchaseInstallment.findUnique({
     where: { id: installmentId },
-    include: { purchase: true },
+    include: { purchase: { include: { participants: true } } },
   });
 
   if (!installment) {
     return { error: "Parcela não encontrada." };
   }
 
-  const visible =
-    installment.purchase.isShared ||
-    installment.purchase.ownerUserId === user.userId;
+  const visible = installment.purchase.participants.some(
+    (p) => p.userId === user.userId
+  );
 
   if (!visible) {
     return { error: "Parcela não encontrada." };
@@ -120,11 +161,13 @@ export async function toggleInstallmentPaid(
 
 export type UpdatePurchaseResult = { error?: string };
 
-// Editar cartao/descricao/compartilhamento e sempre permitido, mesmo com
-// parcela paga (AC 9 da Story 1.14). So valor, numero de parcelas e data da
-// compra disparam regeneracao das installments - e so sao aceitos se nenhuma
-// installment ja estiver paga, senao a acao e bloqueada (AC 10 - ver Dev
-// Notes: reconciliar parcelas pagas com uma regeneracao seria ambiguo).
+// Editar cartao/descricao/participantes e sempre permitido, mesmo com
+// parcela paga (AC 9 da Story 1.14, agora estendida a "participantes" no
+// lugar de "compartilhamento" - Req-11 da divisao entre N participantes).
+// So valor, numero de parcelas e data da compra disparam regeneracao das
+// installments - e so sao aceitos se nenhuma installment ja estiver paga,
+// senao a acao e bloqueada (AC 10 - ver Dev Notes: reconciliar parcelas
+// pagas com uma regeneracao seria ambiguo).
 export async function updatePurchase(
   purchaseId: string,
   input: UpdatePurchaseInput
@@ -133,14 +176,14 @@ export async function updatePurchase(
 
   const purchase = await db.purchase.findUnique({
     where: { id: purchaseId },
-    include: { installments: true },
+    include: { installments: true, participants: true },
   });
 
   if (!purchase) {
     return { error: "Compra não encontrada." };
   }
 
-  const visible = purchase.isShared || purchase.ownerUserId === user.userId;
+  const visible = purchase.participants.some((p) => p.userId === user.userId);
   if (!visible) {
     return { error: "Compra não encontrada." };
   }
@@ -156,7 +199,7 @@ export async function updatePurchase(
     totalCents,
     purchaseDate,
     installmentsCount,
-    isShared,
+    additionalParticipantUserIds,
     category,
   } = parsed.data;
 
@@ -169,6 +212,14 @@ export async function updatePurchase(
   }
   if (!categoryRecord) {
     return { error: "Categoria inválida." };
+  }
+
+  const participants = await resolveParticipantUserIds(
+    user.userId,
+    additionalParticipantUserIds
+  );
+  if ("error" in participants) {
+    return { error: participants.error };
   }
 
   const needsRegeneration =
@@ -195,9 +246,16 @@ export async function updatePurchase(
         totalCents,
         purchaseDate,
         installmentsCount,
-        isShared,
-        ownerUserId: isShared ? null : user.userId,
+        ownerUserId: user.userId,
       },
+    });
+
+    await tx.purchaseParticipant.deleteMany({ where: { purchaseId } });
+    await tx.purchaseParticipant.createMany({
+      data: participants.participantUserIds.map((userId) => ({
+        purchaseId,
+        userId,
+      })),
     });
 
     if (needsRegeneration) {
@@ -231,13 +289,16 @@ export async function deletePurchase(
 ): Promise<DeletePurchaseResult> {
   const user = await requireUser();
 
-  const purchase = await db.purchase.findUnique({ where: { id: purchaseId } });
+  const purchase = await db.purchase.findUnique({
+    where: { id: purchaseId },
+    include: { participants: true },
+  });
 
   if (!purchase) {
     return { error: "Compra não encontrada." };
   }
 
-  const visible = purchase.isShared || purchase.ownerUserId === user.userId;
+  const visible = purchase.participants.some((p) => p.userId === user.userId);
 
   if (!visible) {
     return { error: "Compra não encontrada." };

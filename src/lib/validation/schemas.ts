@@ -19,6 +19,12 @@ export const categorySchema = z.object({
 
 export type CategoryInput = z.infer<typeof categorySchema>;
 
+export const createParticipantSchema = z.object({
+  name: z.string().trim().min(1, "Informe o nome do participante"),
+});
+
+export type CreateParticipantInput = z.infer<typeof createParticipantSchema>;
+
 export const cardSchema = z.object({
   name: z.string().min(1, "Informe o nome do cartão"),
   bank: z.string().min(1, "Informe o banco"),
@@ -63,7 +69,9 @@ export const purchaseSchema = z.object({
     .number()
     .int("Número de parcelas deve ser inteiro")
     .min(1, "Mínimo de 1 parcela"),
-  isShared: z.coerce.boolean(),
+  // IDs de usuarios que dividem a compra alem do dono (que e sempre
+  // implicito - nunca aparece nesta lista). Vazio = compra nao dividida.
+  additionalParticipantUserIds: z.array(z.string().min(1)).default([]),
   // Validado contra a tabela Category na action (mesmo padrao de cardId),
   // nao da pra usar z.enum aqui porque a lista e dinamica.
   category: z.string().min(1, "Selecione uma categoria"),

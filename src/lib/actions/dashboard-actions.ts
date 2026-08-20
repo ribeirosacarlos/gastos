@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { generateInstallmentMonths, type YearMonth } from "@/lib/dates";
-import { convertToBRL, userShareCents } from "@/lib/money";
+import { convertToBRL, splitAmongParticipants, userShareCents } from "@/lib/money";
 
 // Ver Dev Notes da Story 1.8: numero de meses da timeline nao vem do plano
 // (que so diz "proximos N meses") - escolha de implementacao razoavel.
@@ -114,11 +114,11 @@ export async function getMonthlyTimeline(
       where: {
         OR: monthFilter,
         purchase: {
-          OR: [{ ownerUserId: user.userId }, { isShared: true }],
+          participants: { some: { userId: user.userId } },
           isActive: true,
         },
       },
-      include: { purchase: { include: { card: true } } },
+      include: { purchase: { include: { card: true, participants: true } } },
     }),
     db.fixedExpenseInstallment.findMany({
       where: {
@@ -143,7 +143,18 @@ export async function getMonthlyTimeline(
     for (const pi of purchaseInstallments) {
       if (pi.referenceYear !== m.year || pi.referenceMonth !== m.month) continue;
       const currency = pi.purchase.card.currency;
-      const share = userShareCents(pi.valueCents, pi.purchase.isShared);
+      // Dono sempre primeiro na ordem - absorve o(s) centavo(s) de resto
+      // deterministicamente (ver splitAmongParticipants em money.ts).
+      const orderedParticipantIds = [
+        pi.purchase.ownerUserId,
+        ...pi.purchase.participants
+          .map((p) => p.userId)
+          .filter((userId) => userId !== pi.purchase.ownerUserId),
+      ];
+      const share =
+        splitAmongParticipants(pi.valueCents, orderedParticipantIds)[
+          user.userId
+        ] ?? 0;
       addTo(myTotals, currency, share);
       addTo(coupleTotals, currency, pi.valueCents);
       addTo(breakdownPurchases, currency, share);

@@ -1,4 +1,4 @@
-import { requireUser, getOtherUser } from "@/lib/auth";
+import { requireUser, listParticipantCandidates } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { listCategories } from "@/lib/actions/category-actions";
 import { BackLink } from "@/components/back-link";
@@ -7,13 +7,13 @@ import { NewPurchaseForm } from "./purchase-form";
 export default async function NewPurchasePage() {
   const session = await requireUser();
 
-  const [cards, user, otherUser, categories] = await Promise.all([
+  const [cards, user, participantCandidates, categories] = await Promise.all([
     db.card.findMany({
       where: { ownerUserId: session.userId, isActive: true },
       orderBy: { createdAt: "desc" },
     }),
     db.user.findUnique({ where: { id: session.userId } }),
-    getOtherUser(session.userId),
+    listParticipantCandidates(session.userId),
     listCategories(),
   ]);
 
@@ -30,7 +30,7 @@ export default async function NewPurchasePage() {
         }))}
         categories={categories}
         defaultCardId={user?.lastUsedCardId ?? undefined}
-        otherUserName={otherUser?.name}
+        participantCandidates={participantCandidates}
       />
     </main>
   );

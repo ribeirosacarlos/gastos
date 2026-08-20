@@ -11,6 +11,10 @@ import {
 } from "@/lib/validation/schemas";
 import { CurrencyInput } from "@/components/currency-input";
 import { CategoryCombobox } from "@/components/category-combobox";
+import {
+  ParticipantPicker,
+  type ParticipantCandidate,
+} from "@/components/participant-picker";
 import { Button } from "@/components/ui/button";
 import { getContrastTextColor } from "@/lib/utils";
 import type { CategoryOption } from "@/lib/actions/category-actions";
@@ -27,7 +31,7 @@ interface EditPurchaseFormProps {
   cards: CardOption[];
   categories: CategoryOption[];
   hasPaidInstallment: boolean;
-  otherUserName?: string;
+  participantCandidates: ParticipantCandidate[];
   defaultValues: UpdatePurchaseInput;
 }
 
@@ -40,7 +44,7 @@ export function EditPurchaseForm({
   cards,
   categories,
   hasPaidInstallment,
-  otherUserName,
+  participantCandidates,
   defaultValues,
 }: EditPurchaseFormProps) {
   const router = useRouter();
@@ -56,7 +60,6 @@ export function EditPurchaseForm({
   const cardId = useWatch({ control, name: "cardId" });
   const selectedCard = cards.find((c) => c.id === cardId);
   const currency = selectedCard?.currency ?? "BRL";
-  const isShared = useWatch({ control, name: "isShared" });
 
   async function onSubmit(values: UpdatePurchaseInput) {
     setServerError(null);
@@ -83,7 +86,7 @@ export function EditPurchaseForm({
       {hasPaidInstallment && (
         <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
           Esta compra já tem parcela paga: valor, nº de parcelas e data não
-          podem ser alterados. Descrição, categoria, cartão e compartilhamento
+          podem ser alterados. Descrição, categoria, cartão e participantes
           continuam editáveis.
         </p>
       )}
@@ -214,15 +217,23 @@ export function EditPurchaseForm({
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" {...register("isShared")} />
-        Compra compartilhada (conta 50/50 pros dois)
-      </label>
-      {isShared && otherUserName && (
-        <p className="text-xs text-muted-foreground">
-          Compartilhando com: {otherUserName}
-        </p>
-      )}
+      <div className="space-y-1">
+        <label htmlFor="participants" className="text-sm font-medium">
+          Dividir com
+        </label>
+        <Controller
+          control={control}
+          name="additionalParticipantUserIds"
+          render={({ field }) => (
+            <ParticipantPicker
+              id="participants"
+              value={field.value}
+              onChange={field.onChange}
+              candidates={participantCandidates}
+            />
+          )}
+        />
+      </div>
 
       {serverError && (
         <p className="text-sm text-red-600" role="alert">

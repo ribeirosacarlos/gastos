@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { requireUser, getOtherUser } from "@/lib/auth";
+import { requireUser, listParticipantCandidates } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { centsToDisplay } from "@/lib/money";
 import { buttonVariants } from "@/components/ui/button";
 import { CategoryFilter } from "@/components/category-filter";
 import { CardFilter } from "@/components/card-filter";
 import { MonthFilter } from "@/components/month-filter";
-import { DeletePurchaseButton } from "@/components/delete-purchase-button";
+import { PurchasesListing, type PurchaseRow } from "@/components/purchases-listing";
 
 // "2026-08" -> range [inicio do mes, inicio do proximo mes) em UTC -
 // purchaseDate e sempre gravado como meia-noite UTC do dia escolhido (ver
@@ -37,16 +36,20 @@ export default async function PurchasesPage({
   const user = await requireUser();
   const { cardId, category: rawCategory, month: rawMonth } = await searchParams;
 
-  const [allCategories, allCards] = await Promise.all([
+  const [allCategories, ownedCards] = await Promise.all([
     db.category.findMany({ select: { id: true, name: true, isActive: true } }),
+    // Traz cartoes inativos tambem (nao so os do filtro) - a listagem
+    // precisa deles pro select de edicao inline/modal quando a compra
+    // aponta pra um cartao ja desativado, senao a opcao selecionada some.
     db.card.findMany({
-      where: { ownerUserId: user.userId, isActive: true },
-      select: { id: true, name: true, color: true },
+      where: { ownerUserId: user.userId },
+      select: { id: true, name: true, color: true, currency: true, isActive: true },
       orderBy: { name: "asc" },
     }),
   ]);
   const categoryMap = new Map(allCategories.map((c) => [c.id, c.name]));
   const activeCategories = allCategories.filter((c) => c.isActive);
+  const allCards = ownedCards.filter((c) => c.isActive);
   // Categoria invalida na URL (editada a mao, ou excluida) e ignorada, nao
   // filtra pra lista vazia.
   const category = categoryMap.has(rawCategory ?? "") ? rawCategory : undefined;
@@ -54,19 +57,23 @@ export default async function PurchasesPage({
   const monthFilter = rawMonth ? monthRange(rawMonth) : null;
   const month = monthFilter ? rawMonth : undefined;
 
-  const [purchases, otherUser, filterCard] = await Promise.all([
+  const [purchases, participantCandidates, filterCard] = await Promise.all([
     db.purchase.findMany({
       where: {
-        OR: [{ ownerUserId: user.userId }, { isShared: true }],
+        participants: { some: { userId: user.userId } },
         isActive: true,
         ...(cardId ? { cardId } : {}),
         ...(category ? { category } : {}),
         ...(monthFilter ? { purchaseDate: monthFilter } : {}),
       },
-      include: { card: true },
+      include: {
+        card: true,
+        installments: { select: { paid: true } },
+        participants: { include: { user: { select: { id: true, name: true } } } },
+      },
       orderBy: { createdAt: "desc" },
     }),
-    getOtherUser(user.userId),
+    listParticipantCandidates(user.userId),
     cardId ? db.card.findUnique({ where: { id: cardId } }) : null,
   ]);
 
@@ -120,44 +127,25 @@ export default async function PurchasesPage({
             : "Nenhuma compra registrada ainda."}
         </p>
       ) : (
-        <ul className="space-y-2">
-          {purchases.map((purchase) => (
-            <li key={purchase.id} className="rounded-lg border p-4">
-              <Link
-                href={`/purchases/${purchase.id}`}
-                className="block hover:opacity-80"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{purchase.description}</span>
-                  {purchase.isShared && (
-                    <span className="rounded bg-muted px-2 py-0.5 text-xs">
-                      Compartilhada{otherUser ? ` com ${otherUser.name}` : ""}
-                    </span>
-                  )}
-                </div>
-                <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
-                  <span>
-                    {purchase.card.name} ·{" "}
-                    {categoryMap.get(purchase.category) ?? purchase.category}
-                  </span>
-                  <span>
-                    {centsToDisplay(purchase.totalCents, purchase.card.currency)}{" "}
-                    em {purchase.installmentsCount}x
-                  </span>
-                </div>
-              </Link>
-              <div className="mt-3 flex items-center gap-2">
-                <Link
-                  href={`/purchases/${purchase.id}/edit`}
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  Editar
-                </Link>
-                <DeletePurchaseButton purchaseId={purchase.id} size="sm" />
-              </div>
-            </li>
-          ))}
-        </ul>
+        <PurchasesListing
+          purchases={purchases.map(
+            (purchase): PurchaseRow => ({
+              id: purchase.id,
+              cardId: purchase.cardId,
+              description: purchase.description,
+              purchaseDateISO: purchase.purchaseDate.toISOString(),
+              category: purchase.category,
+              totalCents: purchase.totalCents,
+              installmentsCount: purchase.installmentsCount,
+              ownerUserId: purchase.ownerUserId,
+              participants: purchase.participants.map((p) => p.user),
+              hasPaidInstallment: purchase.installments.some((i) => i.paid),
+            }),
+          )}
+          cards={ownedCards}
+          categories={allCategories}
+          participantCandidates={participantCandidates}
+        />
       )}
     </main>
   );

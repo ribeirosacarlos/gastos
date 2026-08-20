@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { requireUser, getOtherUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
 import { InstallmentPreviewTable } from "@/components/installment-preview-table";
@@ -17,23 +17,25 @@ export default async function PurchaseDetailPage({
   const { id } = await params;
   const user = await requireUser();
 
-  const [purchase, otherUser] = await Promise.all([
-    db.purchase.findUnique({
-      where: { id },
-      include: {
-        card: true,
-        installments: { orderBy: { installmentNumber: "asc" } },
-      },
-    }),
-    getOtherUser(user.userId),
-  ]);
+  const purchase = await db.purchase.findUnique({
+    where: { id },
+    include: {
+      card: true,
+      installments: { orderBy: { installmentNumber: "asc" } },
+      participants: { include: { user: { select: { id: true, name: true } } } },
+    },
+  });
 
   const visible =
-    purchase && (purchase.isShared || purchase.ownerUserId === user.userId);
+    purchase && purchase.participants.some((p) => p.userId === user.userId);
 
   if (!purchase || !visible) {
     notFound();
   }
+
+  const otherParticipantNames = purchase.participants
+    .filter((p) => p.userId !== purchase.ownerUserId)
+    .map((p) => p.user.name);
 
   return (
     <main className="mx-auto max-w-sm p-4">
@@ -43,8 +45,8 @@ export default async function PurchaseDetailPage({
         {purchase.card.name} ·{" "}
         {centsToDisplay(purchase.totalCents, purchase.card.currency)} em{" "}
         {purchase.installmentsCount}x
-        {purchase.isShared &&
-          ` · Compartilhada${otherUser ? ` com ${otherUser.name}` : ""}`}
+        {otherParticipantNames.length > 0 &&
+          ` · Dividida com ${otherParticipantNames.join(", ")}`}
       </p>
 
       <InstallmentPreviewTable

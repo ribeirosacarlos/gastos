@@ -17,14 +17,26 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
   return bcrypt.compare(plain, hash);
 }
 
-// App tem só 2 usuários fixos (ver plano) - "a outra pessoa" é sempre
-// não-ambíguo. Usado pra mostrar o nome de quem uma compra/gasto
-// compartilhado é vinculado, tanto no form quanto nas listagens.
+// Gastos fixos (FixedExpense) ainda usam o modelo binario "eu vs a outra
+// pessoa" (fora do escopo da divisao de compra entre N participantes) -
+// mantido tal como esta, so pros fluxos de fixed-expenses/*.
 export async function getOtherUser(
   currentUserId: string
 ): Promise<{ id: string; name: string } | null> {
   return db.user.findFirst({
     where: { id: { not: currentUserId } },
     select: { id: true, name: true },
+  });
+}
+
+// Todos os demais usuarios cadastrados, candidatos a participante de uma
+// divisao de compra (Purchase agora suporta N participantes, nao so 1).
+export async function listParticipantCandidates(
+  currentUserId: string
+): Promise<{ id: string; name: string }[]> {
+  return db.user.findMany({
+    where: { id: { not: currentUserId } },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
   });
 }

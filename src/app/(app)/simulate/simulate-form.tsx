@@ -18,6 +18,10 @@ import { centsToDisplay } from "@/lib/money";
 import { getContrastTextColor } from "@/lib/utils";
 import { DEFAULT_CATEGORY } from "@/lib/categories";
 import { CategoryCombobox } from "@/components/category-combobox";
+import {
+  ParticipantPicker,
+  type ParticipantCandidate,
+} from "@/components/participant-picker";
 import type { CategoryOption } from "@/lib/actions/category-actions";
 
 interface CardOption {
@@ -31,7 +35,7 @@ interface SimulateFormProps {
   cards: CardOption[];
   categories: CategoryOption[];
   defaultCardId?: string;
-  otherUserName?: string;
+  participantCandidates: ParticipantCandidate[];
 }
 
 function todayIsoDate(): string {
@@ -46,7 +50,7 @@ export function SimulateForm({
   cards,
   categories,
   defaultCardId,
-  otherUserName,
+  participantCandidates,
 }: SimulateFormProps) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -75,7 +79,7 @@ export function SimulateForm({
       totalCents: 0,
       purchaseDate: new Date(todayIsoDate()),
       installmentsCount: 1,
-      isShared: false,
+      additionalParticipantUserIds: [],
       category: DEFAULT_CATEGORY,
     },
   });
@@ -83,7 +87,6 @@ export function SimulateForm({
   const cardId = useWatch({ control, name: "cardId" });
   const selectedCard = cards.find((c) => c.id === cardId);
   const currency = selectedCard?.currency ?? "BRL";
-  const isShared = useWatch({ control, name: "isShared" });
 
   async function handleCalculate(values: PurchaseInput) {
     setServerError(null);
@@ -264,15 +267,23 @@ export function SimulateForm({
           </div>
         </div>
 
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" {...register("isShared")} />
-          Compra compartilhada (conta 50/50 pros dois)
-        </label>
-        {isShared && otherUserName && (
-          <p className="text-xs text-muted-foreground">
-            Compartilhando com: {otherUserName}
-          </p>
-        )}
+        <div className="space-y-1">
+          <label htmlFor="participants" className="text-sm font-medium">
+            Dividir com
+          </label>
+          <Controller
+            control={control}
+            name="additionalParticipantUserIds"
+            render={({ field }) => (
+              <ParticipantPicker
+                id="participants"
+                value={field.value}
+                onChange={field.onChange}
+                candidates={participantCandidates}
+              />
+            )}
+          />
+        </div>
 
         {serverError && (
           <p className="text-sm text-red-600" role="alert">

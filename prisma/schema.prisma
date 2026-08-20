@@ -22,6 +22,7 @@ model User {
   ownedCards         Card[]         @relation("CardOwner")
   ownedPurchases     Purchase[]     @relation("PurchaseOwner")
   ownedFixedExpenses FixedExpense[] @relation("FixedExpenseOwner")
+  purchaseParticipations PurchaseParticipant[] @relation("PurchaseParticipant")
 }
 
 model Card {
@@ -60,19 +61,32 @@ model Purchase {
   // fixas dessa story foram seedadas com id = codigo antigo na migration
   // pra nao quebrar dados existentes.
   category          String   @default("other")
-  // isShared=true -> ownerUserId deve ser NULL (conta 50/50 pros dois)
-  // isShared=false -> ownerUserId obrigatorio (conta 100% pro dono)
-  // Invariante validada na camada de aplicacao (Server Actions), Prisma/SQLite
-  // nao tem suporte nativo a CHECK constraints declarativos no schema.
-  isShared          Boolean  @default(false)
-  ownerUserId       String?
-  owner             User?    @relation("PurchaseOwner", fields: [ownerUserId], references: [id])
+  // Dono = sempre o titular do cartao usado (quem pode editar a compra).
+  // Divisao de valor e visibilidade sao definidas por PurchaseParticipant,
+  // nao por um booleano - o dono e sempre um dos participantes (garantido
+  // na camada de aplicacao).
+  ownerUserId       String
+  owner             User     @relation("PurchaseOwner", fields: [ownerUserId], references: [id])
   // Soft-delete: false = excluida, some das listagens/totais. Mesmo padrao
   // de Card.isActive/FixedExpense.isActive (Story 1.14).
   isActive          Boolean  @default(true)
   createdAt         DateTime @default(now())
 
   installments PurchaseInstallment[]
+  participants PurchaseParticipant[]
+}
+
+// Todo participante de uma compra, incluindo o dono (Purchase.ownerUserId
+// tambem aparece aqui como 1 linha). 1 linha = compra nao dividida; 2+ =
+// dividida igualmente entre todos - ver splitAmongParticipants em money.ts.
+model PurchaseParticipant {
+  id         String   @id @default(cuid())
+  purchaseId String
+  purchase   Purchase @relation(fields: [purchaseId], references: [id])
+  userId     String
+  user       User     @relation("PurchaseParticipant", fields: [userId], references: [id])
+
+  @@unique([purchaseId, userId])
 }
 
 model PurchaseInstallment {

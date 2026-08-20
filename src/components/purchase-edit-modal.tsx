@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useForm, useWatch, Controller } from "react-hook-form";
 import { toast } from "sonner";
-import { createPurchase } from "@/lib/actions/purchase-actions";
-import { purchaseSchema, type PurchaseInput } from "@/lib/validation/schemas";
+import { updatePurchase } from "@/lib/actions/purchase-actions";
+import {
+  updatePurchaseSchema,
+  type UpdatePurchaseInput,
+} from "@/lib/validation/schemas";
 import { CurrencyInput } from "@/components/currency-input";
 import { CategoryCombobox } from "@/components/category-combobox";
 import {
@@ -13,62 +15,105 @@ import {
   type ParticipantCandidate,
 } from "@/components/participant-picker";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { getContrastTextColor } from "@/lib/utils";
-import { DEFAULT_CATEGORY } from "@/lib/categories";
 import type { CategoryOption } from "@/lib/actions/category-actions";
 
-interface CardOption {
+export interface EditableCardOption {
   id: string;
   name: string;
   currency: string;
   color: string;
 }
 
-interface NewPurchaseFormProps {
-  cards: CardOption[];
+export interface EditablePurchase {
+  id: string;
+  cardId: string;
+  description: string;
+  totalCents: number;
+  purchaseDateISO: string;
+  installmentsCount: number;
+  additionalParticipantUserIds: string[];
+  category: string;
+  hasPaidInstallment: boolean;
+}
+
+interface PurchaseEditModalProps {
+  purchase: EditablePurchase | null;
+  cards: EditableCardOption[];
   categories: CategoryOption[];
-  defaultCardId?: string;
   participantCandidates: ParticipantCandidate[];
+  onOpenChange: (open: boolean) => void;
+  onSaved: (purchaseId: string, values: UpdatePurchaseInput) => void;
 }
 
-function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-// input type=date so aceita "yyyy-MM-dd" em UTC - toISOString cobre isso
-// direto ja que purchaseDate sempre e gravado como meia-noite UTC.
-function toIsoDate(date: Date): string {
-  return new Date(date).toISOString().slice(0, 10);
-}
-
-export function NewPurchaseForm({
+// Modal de edicao rapida acionado a partir da listagem de /purchases (linha
+// da tabela ou botao "Editar") - mesma logica de negocio de
+// edit-purchase-form.tsx (bloqueio de valor/parcelas/data com parcela paga),
+// mas fecha de volta pra listagem em vez de navegar pra uma pagina cheia.
+export function PurchaseEditModal({
+  purchase,
   cards,
   categories,
-  defaultCardId,
   participantCandidates,
-}: NewPurchaseFormProps) {
-  const router = useRouter();
-  const [serverError, setServerError] = useState<string | null>(null);
+  onOpenChange,
+  onSaved,
+}: PurchaseEditModalProps) {
+  return (
+    <Dialog open={purchase !== null} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Editar compra</DialogTitle>
+        </DialogHeader>
+        {purchase && (
+          <PurchaseEditModalForm
+            key={purchase.id}
+            purchase={purchase}
+            cards={cards}
+            categories={categories}
+            participantCandidates={participantCandidates}
+            onOpenChange={onOpenChange}
+            onSaved={onSaved}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-  const initialCardId =
-    (defaultCardId && cards.some((c) => c.id === defaultCardId)
-      ? defaultCardId
-      : cards[0]?.id) ?? "";
+function PurchaseEditModalForm({
+  purchase,
+  cards,
+  categories,
+  participantCandidates,
+  onOpenChange,
+  onSaved,
+}: {
+  purchase: EditablePurchase;
+} & Omit<PurchaseEditModalProps, "purchase">) {
+  const [serverError, setServerError] = useState<string | null>(null);
+  const hasPaidInstallment = purchase.hasPaidInstallment;
 
   const {
     register,
     handleSubmit,
     control,
     formState: { isSubmitting },
-  } = useForm<PurchaseInput>({
+  } = useForm<UpdatePurchaseInput>({
     defaultValues: {
-      cardId: initialCardId,
-      description: "",
-      totalCents: 0,
-      purchaseDate: new Date(todayIsoDate()),
-      installmentsCount: 1,
-      additionalParticipantUserIds: [],
-      category: DEFAULT_CATEGORY,
+      cardId: purchase.cardId,
+      description: purchase.description,
+      totalCents: purchase.totalCents,
+      purchaseDate: new Date(purchase.purchaseDateISO),
+      installmentsCount: purchase.installmentsCount,
+      additionalParticipantUserIds: purchase.additionalParticipantUserIds,
+      category: purchase.category,
     },
   });
 
@@ -76,38 +121,38 @@ export function NewPurchaseForm({
   const selectedCard = cards.find((c) => c.id === cardId);
   const currency = selectedCard?.currency ?? "BRL";
 
-  async function onSubmit(values: PurchaseInput) {
+  async function onSubmit(values: UpdatePurchaseInput) {
     setServerError(null);
 
-    const parsed = purchaseSchema.safeParse(values);
+    const parsed = updatePurchaseSchema.safeParse(values);
     if (!parsed.success) {
       setServerError(parsed.error.issues[0]?.message ?? "Dados inválidos.");
       return;
     }
 
-    const result = await createPurchase(parsed.data);
+    const result = await updatePurchase(purchase.id, parsed.data);
     if (result.error) {
       setServerError(result.error);
       return;
     }
 
-    toast.success("Compra registrada.");
-    router.push("/purchases");
-    router.refresh();
-  }
-
-  if (cards.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Você ainda não tem nenhum cartão ativo. Cadastre um cartão primeiro.
-      </p>
-    );
+    toast.success("Compra atualizada.");
+    onSaved(purchase.id, parsed.data);
+    onOpenChange(false);
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      {hasPaidInstallment && (
+        <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          Esta compra já tem parcela paga: valor, nº de parcelas e data não
+          podem ser alterados. Descrição, categoria, cartão e
+          participantes continuam editáveis.
+        </p>
+      )}
+
       <div className="space-y-1">
-        <label htmlFor="cardId" className="text-sm font-medium">
+        <label htmlFor="modal-cardId" className="text-sm font-medium">
           Cartão
         </label>
         <div className="flex items-center gap-2">
@@ -116,7 +161,7 @@ export function NewPurchaseForm({
             style={{ backgroundColor: selectedCard?.color ?? "#64748b" }}
           />
           <select
-            id="cardId"
+            id="modal-cardId"
             className="w-full rounded-md border px-3 py-2 text-sm"
             {...register("cardId", { required: true })}
           >
@@ -138,19 +183,20 @@ export function NewPurchaseForm({
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="description" className="text-sm font-medium">
+        <label htmlFor="modal-description" className="text-sm font-medium">
           Descrição
         </label>
         <input
-          id="description"
+          id="modal-description"
           type="text"
+          autoFocus
           className="w-full rounded-md border px-3 py-2 text-sm"
           {...register("description", { required: true })}
         />
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="category" className="text-sm font-medium">
+        <label htmlFor="modal-category" className="text-sm font-medium">
           Categoria
         </label>
         <Controller
@@ -158,7 +204,7 @@ export function NewPurchaseForm({
           name="category"
           render={({ field }) => (
             <CategoryCombobox
-              id="category"
+              id="modal-category"
               value={field.value}
               onChange={field.onChange}
               categories={categories}
@@ -168,7 +214,7 @@ export function NewPurchaseForm({
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="totalCents" className="text-sm font-medium">
+        <label htmlFor="modal-totalCents" className="text-sm font-medium">
           Valor
         </label>
         <Controller
@@ -176,10 +222,11 @@ export function NewPurchaseForm({
           name="totalCents"
           render={({ field }) => (
             <CurrencyInput
-              id="totalCents"
+              id="modal-totalCents"
               currency={currency}
               value={field.value}
               onChange={field.onChange}
+              disabled={hasPaidInstallment}
             />
           )}
         />
@@ -187,7 +234,7 @@ export function NewPurchaseForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label htmlFor="purchaseDate" className="text-sm font-medium">
+          <label htmlFor="modal-purchaseDate" className="text-sm font-medium">
             Data da compra
           </label>
           <Controller
@@ -195,11 +242,16 @@ export function NewPurchaseForm({
             name="purchaseDate"
             render={({ field }) => (
               <input
-                id="purchaseDate"
+                id="modal-purchaseDate"
                 type="date"
                 required
-                value={field.value ? toIsoDate(field.value) : ""}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                value={
+                  field.value
+                    ? new Date(field.value).toISOString().slice(0, 10)
+                    : ""
+                }
+                disabled={hasPaidInstallment}
+                className="w-full rounded-md border px-3 py-2 text-sm disabled:opacity-50"
                 onChange={(e) =>
                   field.onChange(
                     e.target.value
@@ -213,14 +265,18 @@ export function NewPurchaseForm({
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="installmentsCount" className="text-sm font-medium">
+          <label
+            htmlFor="modal-installmentsCount"
+            className="text-sm font-medium"
+          >
             Nº de parcelas
           </label>
           <input
-            id="installmentsCount"
+            id="modal-installmentsCount"
             type="number"
             min={1}
-            className="w-full rounded-md border px-3 py-2 text-sm"
+            disabled={hasPaidInstallment}
+            className="w-full rounded-md border px-3 py-2 text-sm disabled:opacity-50"
             {...register("installmentsCount", {
               valueAsNumber: true,
               required: true,
@@ -230,7 +286,7 @@ export function NewPurchaseForm({
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="participants" className="text-sm font-medium">
+        <label htmlFor="modal-participants" className="text-sm font-medium">
           Dividir com
         </label>
         <Controller
@@ -238,7 +294,7 @@ export function NewPurchaseForm({
           name="additionalParticipantUserIds"
           render={({ field }) => (
             <ParticipantPicker
-              id="participants"
+              id="modal-participants"
               value={field.value}
               onChange={field.onChange}
               candidates={participantCandidates}
@@ -253,9 +309,14 @@ export function NewPurchaseForm({
         </p>
       )}
 
-      <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? "Salvando..." : "Salvar"}
-      </Button>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Salvando..." : "Salvar"}
+        </Button>
+      </DialogFooter>
     </form>
   );
 }
