@@ -70,6 +70,7 @@ export default async function EditPurchasePage({
           purchaseDate: purchase.purchaseDate,
           installmentsCount: purchase.installmentsCount,
           additionalParticipantUserIds,
+          chargedUserId: purchase.chargedUserId,
           category: purchase.category,
         }}
       />

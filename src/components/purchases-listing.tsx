@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Receipt } from "lucide-react";
-import { centsToDisplay } from "@/lib/money";
+import { centsToDisplay, splitPurchaseShare, splitValue } from "@/lib/money";
 import { buttonVariants } from "@/components/ui/button";
 import { DeletePurchaseButton } from "@/components/delete-purchase-button";
 import {
@@ -11,6 +12,7 @@ import {
   type EditableCardOption,
   type EditablePurchase,
 } from "@/components/purchase-edit-modal";
+import { PurchaseDuplicateModal } from "@/components/purchase-duplicate-modal";
 import type { ParticipantCandidate } from "@/components/participant-picker";
 import { CurrencyInput } from "@/components/currency-input";
 import { updatePurchase } from "@/lib/actions/purchase-actions";
@@ -28,6 +30,7 @@ export interface PurchaseRow {
   totalCents: number;
   installmentsCount: number;
   ownerUserId: string;
+  chargedUserId: string | null;
   participants: ParticipantCandidate[];
   hasPaidInstallment: boolean;
 }
@@ -37,10 +40,47 @@ interface PurchasesListingProps {
   cards: EditableCardOption[];
   categories: CategoryOption[];
   participantCandidates: ParticipantCandidate[];
+  currentUserId: string;
 }
 
 function otherParticipants(row: PurchaseRow): ParticipantCandidate[] {
   return row.participants.filter((p) => p.id !== row.ownerUserId);
+}
+
+function installmentValueLabel(
+  totalCents: number,
+  installmentsCount: number,
+  currency: string
+): string | null {
+  if (installmentsCount <= 1) return null;
+
+  const installmentValues = splitValue(totalCents, installmentsCount);
+  const firstValue = installmentValues[0];
+  const lastValue = installmentValues[installmentValues.length - 1];
+
+  if (firstValue === lastValue) {
+    return `${installmentsCount}x de ${centsToDisplay(firstValue, currency)}`;
+  }
+
+  return `${installmentsCount}x de ${centsToDisplay(firstValue, currency)} (ult. ${centsToDisplay(lastValue, currency)})`;
+}
+
+function paymentLabel(row: PurchaseRow): string | null {
+  if (row.chargedUserId) {
+    const chargedParticipant = row.participants.find(
+      (participant) => participant.id === row.chargedUserId
+    );
+    return chargedParticipant ? `100% por ${chargedParticipant.name}` : null;
+  }
+
+  const others = otherParticipants(row);
+  return others.length > 0
+    ? `Dividida com ${others.map((participant) => participant.name).join(", ")}`
+    : null;
+}
+
+function isSharedPurchase(row: PurchaseRow): boolean {
+  return otherParticipants(row).length > 0;
 }
 
 type SortKey = "purchaseDate" | "description" | "cardName" | "categoryLabel" | "totalCents";
@@ -70,6 +110,16 @@ interface SortableRow {
   cardName: string;
   categoryLabel: string;
   totalCents: number;
+  myShareCents: number;
+}
+
+function rowShareCents(row: PurchaseRow, currentUserId: string): number {
+  const participantIds = [
+    row.ownerUserId,
+    ...row.participants.filter((p) => p.id !== row.ownerUserId).map((p) => p.id),
+  ];
+  const shares = splitPurchaseShare(row.totalCents, participantIds, row.chargedUserId);
+  return shares[currentUserId] ?? 0;
 }
 
 function compareRows(a: SortableRow, b: SortableRow, key: SortKey): number {
@@ -85,14 +135,22 @@ export function PurchasesListing({
   cards,
   categories,
   participantCandidates,
+  currentUserId,
 }: PurchasesListingProps) {
   const [rows, setRows] = useState(purchases);
+  const [prevPurchases, setPrevPurchases] = useState(purchases);
+  if (purchases !== prevPurchases) {
+    setPrevPurchases(purchases);
+    setRows(purchases);
+  }
   const [view, setView] = useState<View>("table");
   const [sortKey, setSortKey] = useState<SortKey>("purchaseDate");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [editingCell, setEditingCell] = useState<EditingCell>(null);
   const [editingPurchaseId, setEditingPurchaseId] = useState<string | null>(null);
+  const [duplicatingPurchaseId, setDuplicatingPurchaseId] = useState<string | null>(null);
   const [, startSaving] = useTransition();
+  const router = useRouter();
 
   const cardsById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const categoriesById = useMemo(
@@ -111,9 +169,10 @@ export function PurchasesListing({
           cardColor: card?.color ?? "#64748b",
           cardCurrency: card?.currency ?? "BRL",
           categoryLabel: category?.name ?? row.category,
+          myShareCents: rowShareCents(row, currentUserId),
         };
       }),
-    [rows, cardsById, categoriesById],
+    [rows, cardsById, categoriesById, currentUserId],
   );
 
   const sortedRows = useMemo(() => {
@@ -125,6 +184,10 @@ export function PurchasesListing({
     () => rows.reduce((sum, r) => sum + r.totalCents, 0),
     [rows],
   );
+  const myTotalCents = useMemo(
+    () => rows.reduce((sum, row) => sum + rowShareCents(row, currentUserId), 0),
+    [rows, currentUserId],
+  );
 
   const editingPurchase: EditablePurchase | null = useMemo(() => {
     const row = rows.find((r) => r.id === editingPurchaseId);
@@ -132,9 +195,21 @@ export function PurchasesListing({
       ? {
           ...row,
           additionalParticipantUserIds: otherParticipants(row).map((p) => p.id),
+          chargedUserId: row.chargedUserId,
         }
       : null;
   }, [rows, editingPurchaseId]);
+
+  const duplicatingPurchase: EditablePurchase | null = useMemo(() => {
+    const row = rows.find((r) => r.id === duplicatingPurchaseId);
+    return row
+      ? {
+          ...row,
+          additionalParticipantUserIds: otherParticipants(row).map((p) => p.id),
+          chargedUserId: row.chargedUserId,
+        }
+      : null;
+  }, [rows, duplicatingPurchaseId]);
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -157,6 +232,7 @@ export function PurchasesListing({
               purchaseDateISO: values.purchaseDate.toISOString(),
               installmentsCount: values.installmentsCount,
               category: values.category,
+              chargedUserId: values.chargedUserId,
               participants: [
                 ...r.participants.filter((p) => p.id === r.ownerUserId),
                 ...values.additionalParticipantUserIds
@@ -179,6 +255,7 @@ export function PurchasesListing({
       purchaseDate: new Date(row.purchaseDateISO),
       installmentsCount: row.installmentsCount,
       additionalParticipantUserIds: otherParticipants(row).map((p) => p.id),
+      chargedUserId: row.chargedUserId,
       category: row.category,
       ...patch,
     };
@@ -213,6 +290,10 @@ export function PurchasesListing({
           {rows.length} {rows.length === 1 ? "compra" : "compras"} ·{" "}
           <span className="font-medium text-foreground">
             Total: {centsToDisplay(totalCents, "BRL")}
+          </span>
+          {" · "}
+          <span className="font-medium text-foreground">
+            Minha parte: {centsToDisplay(myTotalCents, "BRL")}
           </span>
         </p>
         <div className="inline-flex rounded-md border p-0.5 text-sm">
@@ -323,6 +404,13 @@ export function PurchasesListing({
                       >
                         Editar
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setDuplicatingPurchaseId(row.id)}
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
+                      >
+                        Duplicar
+                      </button>
                       <DeletePurchaseButton purchaseId={row.id} size="sm" />
                     </div>
                   </td>
@@ -336,6 +424,9 @@ export function PurchasesListing({
                 </td>
                 <td className="px-3 py-2 text-right">
                   {centsToDisplay(totalCents, "BRL")}
+                  <div className="text-xs font-normal text-muted-foreground">
+                    Minha parte: {centsToDisplay(myTotalCents, "BRL")}
+                  </div>
                 </td>
                 <td />
               </tr>
@@ -353,12 +444,9 @@ export function PurchasesListing({
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{row.description}</span>
-                  {otherParticipants(row).length > 0 && (
+                  {paymentLabel(row) && (
                     <span className="rounded bg-muted px-2 py-0.5 text-xs">
-                      Dividida com{" "}
-                      {otherParticipants(row)
-                        .map((p) => p.name)
-                        .join(", ")}
+                      {paymentLabel(row)}
                     </span>
                   )}
                 </div>
@@ -372,10 +460,25 @@ export function PurchasesListing({
                     {DATE_FORMATTER.format(new Date(row.purchaseDateISO))}
                   </span>
                   <span>
-                    {centsToDisplay(row.totalCents, row.cardCurrency)} em{" "}
-                    {row.installmentsCount}x
+                    {centsToDisplay(row.totalCents, row.cardCurrency)}
+                    {installmentValueLabel(
+                      row.totalCents,
+                      row.installmentsCount,
+                      row.cardCurrency
+                    )
+                      ? ` · ${installmentValueLabel(
+                          row.totalCents,
+                          row.installmentsCount,
+                          row.cardCurrency
+                        )}`
+                      : ""}
                   </span>
                 </div>
+                {isSharedPurchase(row) && (
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    Minha parte: {centsToDisplay(row.myShareCents, row.cardCurrency)}
+                  </div>
+                )}
               </button>
               <div className="mt-3 flex items-center gap-2">
                 <Link
@@ -391,6 +494,13 @@ export function PurchasesListing({
                   className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
                   Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDuplicatingPurchaseId(row.id)}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Duplicar
                 </button>
                 <DeletePurchaseButton purchaseId={row.id} size="sm" />
               </div>
@@ -409,6 +519,17 @@ export function PurchasesListing({
         }}
         onSaved={handleModalSaved}
       />
+
+      <PurchaseDuplicateModal
+        purchase={duplicatingPurchase}
+        cards={cards}
+        categories={categories}
+        participantCandidates={participantCandidates}
+        onOpenChange={(open) => {
+          if (!open) setDuplicatingPurchaseId(null);
+        }}
+        onSaved={() => router.refresh()}
+      />
     </div>
   );
 }
@@ -421,7 +542,13 @@ export function PurchasesListing({
 // botao "Editar" da coluna Acoes, ou no card inteiro na view mobile.
 
 interface CellProps {
-  row: PurchaseRow & { cardName: string; cardColor: string; cardCurrency: string; categoryLabel: string };
+  row: PurchaseRow & {
+    cardName: string;
+    cardColor: string;
+    cardCurrency: string;
+    categoryLabel: string;
+    myShareCents: number;
+  };
   editing: boolean;
   onStartEdit: () => void;
   onCancel: () => void;
@@ -478,8 +605,10 @@ function DescriptionCell({ row, editing, onStartEdit, onCancel, onSave }: CellPr
       }}
     >
       {row.description}
-      {otherParticipants(row).length > 0 && (
-        <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs">Dividida</span>
+      {paymentLabel(row) && (
+        <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs">
+          {row.chargedUserId ? "100% terceiro" : "Dividida"}
+        </span>
       )}
     </td>
   );
@@ -598,8 +727,27 @@ function ValorCell({ row, editing, onStartEdit, onCancel, onSave }: CellProps) {
         className="whitespace-nowrap px-3 py-2 text-right text-muted-foreground"
         title="Parcela já paga: valor não pode ser alterado."
       >
-        {centsToDisplay(row.totalCents, row.cardCurrency)}{" "}
-        <span>em {row.installmentsCount}x</span>
+        <div>{centsToDisplay(row.totalCents, row.cardCurrency)}</div>
+        {installmentValueLabel(
+          row.totalCents,
+          row.installmentsCount,
+          row.cardCurrency
+        ) && (
+          <div>
+            <span>
+              {installmentValueLabel(
+                row.totalCents,
+                row.installmentsCount,
+                row.cardCurrency
+              )}
+            </span>
+          </div>
+        )}
+        {isSharedPurchase(row) && (
+          <div className="text-xs">
+            Minha parte: {centsToDisplay(row.myShareCents, row.cardCurrency)}
+          </div>
+        )}
       </td>
     );
   }
@@ -632,8 +780,27 @@ function ValorCell({ row, editing, onStartEdit, onCancel, onSave }: CellProps) {
         onStartEdit();
       }}
     >
-      {centsToDisplay(row.totalCents, row.cardCurrency)}{" "}
-      <span className="text-muted-foreground">em {row.installmentsCount}x</span>
+      <div>{centsToDisplay(row.totalCents, row.cardCurrency)}</div>
+      {installmentValueLabel(
+        row.totalCents,
+        row.installmentsCount,
+        row.cardCurrency
+      ) && (
+        <div>
+          <span className="text-muted-foreground">
+            {installmentValueLabel(
+              row.totalCents,
+              row.installmentsCount,
+              row.cardCurrency
+            )}
+          </span>
+        </div>
+      )}
+      {isSharedPurchase(row) && (
+        <div className="text-xs text-muted-foreground">
+          Minha parte: {centsToDisplay(row.myShareCents, row.cardCurrency)}
+        </div>
+      )}
     </td>
   );
 }

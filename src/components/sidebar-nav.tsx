@@ -9,6 +9,7 @@ import {
   Repeat,
   Calculator,
   ArrowLeftRight,
+  HandCoins,
   Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/cards", label: "Cartões", icon: CreditCard },
   { href: "/purchases", label: "Compras", icon: ShoppingCart },
+  { href: "/receivables", label: "A receber", icon: HandCoins },
   { href: "/fixed-expenses", label: "Fixos", icon: Repeat },
   { href: "/simulate", label: "Simular", icon: Calculator },
   { href: "/categories", label: "Categorias", icon: Tag },

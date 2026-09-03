@@ -1,14 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useForm, useWatch, Controller } from "react-hook-form";
 import { toast } from "sonner";
-import { updatePurchase } from "@/lib/actions/purchase-actions";
-import {
-  updatePurchaseSchema,
-  type UpdatePurchaseInput,
-} from "@/lib/validation/schemas";
+import { createPurchase } from "@/lib/actions/purchase-actions";
+import { purchaseSchema, type PurchaseInput } from "@/lib/validation/schemas";
 import { CurrencyInput } from "@/components/currency-input";
 import { CategoryCombobox } from "@/components/category-combobox";
 import {
@@ -17,38 +13,71 @@ import {
 } from "@/components/participant-picker";
 import { PurchaseChargeSelect } from "@/components/purchase-charge-select";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { getContrastTextColor } from "@/lib/utils";
 import type { CategoryOption } from "@/lib/actions/category-actions";
+import type { EditableCardOption, EditablePurchase } from "@/components/purchase-edit-modal";
 
-interface CardOption {
-  id: string;
-  name: string;
-  currency: string;
-  color: string;
-}
-
-interface EditPurchaseFormProps {
-  purchaseId: string;
-  cards: CardOption[];
+interface PurchaseDuplicateModalProps {
+  purchase: EditablePurchase | null;
+  cards: EditableCardOption[];
   categories: CategoryOption[];
-  hasPaidInstallment: boolean;
   participantCandidates: ParticipantCandidate[];
-  defaultValues: UpdatePurchaseInput;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
 }
 
-function toIsoDate(date: Date): string {
-  return new Date(date).toISOString().slice(0, 10);
-}
-
-export function EditPurchaseForm({
-  purchaseId,
+// Modal de duplicacao acionado a partir da listagem de /purchases (botao
+// "Duplicar") - mesmo layout de PurchaseEditModal, mas cria uma compra nova
+// e independente (createPurchase) em vez de editar a original, entao nao
+// reaplica o bloqueio de hasPaidInstallment (a compra original nunca e
+// alvo de mutacao aqui).
+export function PurchaseDuplicateModal({
+  purchase,
   cards,
   categories,
-  hasPaidInstallment,
   participantCandidates,
-  defaultValues,
-}: EditPurchaseFormProps) {
-  const router = useRouter();
+  onOpenChange,
+  onSaved,
+}: PurchaseDuplicateModalProps) {
+  return (
+    <Dialog open={purchase !== null} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Duplicar compra</DialogTitle>
+        </DialogHeader>
+        {purchase && (
+          <PurchaseDuplicateModalForm
+            key={purchase.id}
+            purchase={purchase}
+            cards={cards}
+            categories={categories}
+            participantCandidates={participantCandidates}
+            onOpenChange={onOpenChange}
+            onSaved={onSaved}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PurchaseDuplicateModalForm({
+  purchase,
+  cards,
+  categories,
+  participantCandidates,
+  onOpenChange,
+  onSaved,
+}: {
+  purchase: EditablePurchase;
+} & Omit<PurchaseDuplicateModalProps, "purchase">) {
   const [serverError, setServerError] = useState<string | null>(null);
 
   const {
@@ -57,7 +86,18 @@ export function EditPurchaseForm({
     control,
     setValue,
     formState: { isSubmitting },
-  } = useForm<UpdatePurchaseInput>({ defaultValues });
+  } = useForm<PurchaseInput>({
+    defaultValues: {
+      cardId: purchase.cardId,
+      description: purchase.description,
+      totalCents: purchase.totalCents,
+      purchaseDate: new Date(purchase.purchaseDateISO),
+      installmentsCount: purchase.installmentsCount,
+      additionalParticipantUserIds: purchase.additionalParticipantUserIds,
+      chargedUserId: purchase.chargedUserId,
+      category: purchase.category,
+    },
+  });
 
   const cardId = useWatch({ control, name: "cardId" });
   const watchedAdditionalParticipantUserIds = useWatch({
@@ -82,38 +122,30 @@ export function EditPurchaseForm({
     }
   }, [additionalParticipantUserIds, chargedUserId, setValue]);
 
-  async function onSubmit(values: UpdatePurchaseInput) {
+  async function onSubmit(values: PurchaseInput) {
     setServerError(null);
 
-    const parsed = updatePurchaseSchema.safeParse(values);
+    const parsed = purchaseSchema.safeParse(values);
     if (!parsed.success) {
       setServerError(parsed.error.issues[0]?.message ?? "Dados inválidos.");
       return;
     }
 
-    const result = await updatePurchase(purchaseId, parsed.data);
+    const result = await createPurchase(parsed.data);
     if (result.error) {
       setServerError(result.error);
       return;
     }
 
-    toast.success("Compra atualizada.");
-    router.push(`/purchases/${purchaseId}`);
-    router.refresh();
+    toast.success("Compra duplicada.");
+    onSaved();
+    onOpenChange(false);
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {hasPaidInstallment && (
-        <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-          Esta compra já tem parcela paga: valor, nº de parcelas e data não
-          podem ser alterados. Descrição, categoria, cartão e participantes
-          continuam editáveis.
-        </p>
-      )}
-
       <div className="space-y-1">
-        <label htmlFor="cardId" className="text-sm font-medium">
+        <label htmlFor="duplicate-cardId" className="text-sm font-medium">
           Cartão
         </label>
         <div className="flex items-center gap-2">
@@ -122,7 +154,7 @@ export function EditPurchaseForm({
             style={{ backgroundColor: selectedCard?.color ?? "#64748b" }}
           />
           <select
-            id="cardId"
+            id="duplicate-cardId"
             className="w-full rounded-md border px-3 py-2 text-sm"
             {...register("cardId", { required: true })}
           >
@@ -144,19 +176,20 @@ export function EditPurchaseForm({
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="description" className="text-sm font-medium">
+        <label htmlFor="duplicate-description" className="text-sm font-medium">
           Descrição
         </label>
         <input
-          id="description"
+          id="duplicate-description"
           type="text"
+          autoFocus
           className="w-full rounded-md border px-3 py-2 text-sm"
           {...register("description", { required: true })}
         />
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="category" className="text-sm font-medium">
+        <label htmlFor="duplicate-category" className="text-sm font-medium">
           Categoria
         </label>
         <Controller
@@ -164,7 +197,7 @@ export function EditPurchaseForm({
           name="category"
           render={({ field }) => (
             <CategoryCombobox
-              id="category"
+              id="duplicate-category"
               value={field.value}
               onChange={field.onChange}
               categories={categories}
@@ -174,7 +207,7 @@ export function EditPurchaseForm({
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="totalCents" className="text-sm font-medium">
+        <label htmlFor="duplicate-totalCents" className="text-sm font-medium">
           Valor
         </label>
         <Controller
@@ -182,11 +215,10 @@ export function EditPurchaseForm({
           name="totalCents"
           render={({ field }) => (
             <CurrencyInput
-              id="totalCents"
+              id="duplicate-totalCents"
               currency={currency}
               value={field.value}
               onChange={field.onChange}
-              disabled={hasPaidInstallment}
             />
           )}
         />
@@ -194,7 +226,7 @@ export function EditPurchaseForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label htmlFor="purchaseDate" className="text-sm font-medium">
+          <label htmlFor="duplicate-purchaseDate" className="text-sm font-medium">
             Data da compra
           </label>
           <Controller
@@ -202,12 +234,15 @@ export function EditPurchaseForm({
             name="purchaseDate"
             render={({ field }) => (
               <input
-                id="purchaseDate"
+                id="duplicate-purchaseDate"
                 type="date"
                 required
-                value={field.value ? toIsoDate(field.value) : ""}
-                disabled={hasPaidInstallment}
-                className="w-full rounded-md border px-3 py-2 text-sm disabled:opacity-50"
+                value={
+                  field.value
+                    ? new Date(field.value).toISOString().slice(0, 10)
+                    : ""
+                }
+                className="w-full rounded-md border px-3 py-2 text-sm"
                 onChange={(e) =>
                   field.onChange(
                     e.target.value
@@ -221,15 +256,17 @@ export function EditPurchaseForm({
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="installmentsCount" className="text-sm font-medium">
+          <label
+            htmlFor="duplicate-installmentsCount"
+            className="text-sm font-medium"
+          >
             Nº de parcelas
           </label>
           <input
-            id="installmentsCount"
+            id="duplicate-installmentsCount"
             type="number"
             min={1}
-            disabled={hasPaidInstallment}
-            className="w-full rounded-md border px-3 py-2 text-sm disabled:opacity-50"
+            className="w-full rounded-md border px-3 py-2 text-sm"
             {...register("installmentsCount", {
               valueAsNumber: true,
               required: true,
@@ -239,7 +276,7 @@ export function EditPurchaseForm({
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="participants" className="text-sm font-medium">
+        <label htmlFor="duplicate-participants" className="text-sm font-medium">
           Dividir com
         </label>
         <Controller
@@ -247,7 +284,7 @@ export function EditPurchaseForm({
           name="additionalParticipantUserIds"
           render={({ field }) => (
             <ParticipantPicker
-              id="participants"
+              id="duplicate-participants"
               value={field.value}
               onChange={field.onChange}
               candidates={participantCandidates}
@@ -261,7 +298,7 @@ export function EditPurchaseForm({
         name="chargedUserId"
         render={({ field }) => (
           <PurchaseChargeSelect
-            id="chargedUserId"
+            id="duplicate-chargedUserId"
             participantIds={additionalParticipantUserIds}
             candidates={participantCandidates}
             value={field.value}
@@ -276,9 +313,14 @@ export function EditPurchaseForm({
         </p>
       )}
 
-      <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? "Salvando..." : "Salvar"}
-      </Button>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Salvando..." : "Salvar"}
+        </Button>
+      </DialogFooter>
     </form>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { QuickAddSheet } from "@/components/quick-add-sheet";
 import type { CategoryOption } from "@/lib/actions/category-actions";
@@ -27,6 +28,15 @@ export function QuickAddFab({
   participantCandidates,
 }: QuickAddFabProps) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const filterCardId =
+    pathname === "/purchases" ? (searchParams.get("cardId") ?? undefined) : undefined;
+  const effectiveDefaultCardId =
+    filterCardId && cards.some((c) => c.id === filterCardId)
+      ? filterCardId
+      : defaultCardId;
 
   return (
     <>
@@ -43,7 +53,7 @@ export function QuickAddFab({
         onOpenChange={setOpen}
         cards={cards}
         categories={categories}
-        defaultCardId={defaultCardId}
+        defaultCardId={effectiveDefaultCardId}
         participantCandidates={participantCandidates}
       />
     </>

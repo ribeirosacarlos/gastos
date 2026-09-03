@@ -4,22 +4,19 @@ import { db } from "@/lib/db";
 import { buttonVariants } from "@/components/ui/button";
 import { CategoryFilter } from "@/components/category-filter";
 import { CardFilter } from "@/components/card-filter";
+import { InstallmentsFilter } from "@/components/installments-filter";
 import { MonthFilter } from "@/components/month-filter";
 import { PurchasesListing, type PurchaseRow } from "@/components/purchases-listing";
 
-// "2026-08" -> range [inicio do mes, inicio do proximo mes) em UTC -
-// purchaseDate e sempre gravado como meia-noite UTC do dia escolhido (ver
-// fix do campo de data), entao o range tem que ser em UTC tambem pra bater.
-function monthRange(month: string): { gte: Date; lt: Date } | null {
+// "2026-08" -> { year: 2026, month: 8 } para filtrar a fatura das parcelas
+// (referenceYear/referenceMonth), nao a data original da compra.
+function invoiceMonth(month: string): { year: number; month: number } | null {
   const match = /^(\d{4})-(\d{2})$/.exec(month);
   if (!match) return null;
   const year = Number(match[1]);
   const monthIndex = Number(match[2]) - 1;
   if (monthIndex < 0 || monthIndex > 11) return null;
-  return {
-    gte: new Date(Date.UTC(year, monthIndex, 1)),
-    lt: new Date(Date.UTC(year, monthIndex + 1, 1)),
-  };
+  return { year, month: monthIndex + 1 };
 }
 
 const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
@@ -31,10 +28,20 @@ const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
 export default async function PurchasesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cardId?: string; category?: string; month?: string }>;
+  searchParams: Promise<{
+    cardId?: string;
+    category?: string;
+    month?: string;
+    installments?: string;
+  }>;
 }) {
   const user = await requireUser();
-  const { cardId, category: rawCategory, month: rawMonth } = await searchParams;
+  const {
+    cardId,
+    category: rawCategory,
+    month: rawMonth,
+    installments: rawInstallments,
+  } = await searchParams;
 
   const [allCategories, ownedCards] = await Promise.all([
     db.category.findMany({ select: { id: true, name: true, isActive: true } }),
@@ -53,9 +60,10 @@ export default async function PurchasesPage({
   // Categoria invalida na URL (editada a mao, ou excluida) e ignorada, nao
   // filtra pra lista vazia.
   const category = categoryMap.has(rawCategory ?? "") ? rawCategory : undefined;
-  // Mesma logica pro mes: formato invalido na URL e ignorado.
-  const monthFilter = rawMonth ? monthRange(rawMonth) : null;
-  const month = monthFilter ? rawMonth : undefined;
+  // Mesma logica pro mes/fatura: formato invalido na URL e ignorado.
+  const invoiceMonthFilter = rawMonth ? invoiceMonth(rawMonth) : null;
+  const month = invoiceMonthFilter ? rawMonth : undefined;
+  const installments = rawInstallments === "multi" ? "multi" : undefined;
 
   const [purchases, participantCandidates, filterCard] = await Promise.all([
     db.purchase.findMany({
@@ -64,7 +72,17 @@ export default async function PurchasesPage({
         isActive: true,
         ...(cardId ? { cardId } : {}),
         ...(category ? { category } : {}),
-        ...(monthFilter ? { purchaseDate: monthFilter } : {}),
+        ...(installments ? { installmentsCount: { gt: 1 } } : {}),
+        ...(invoiceMonthFilter
+          ? {
+              installments: {
+                some: {
+                  referenceYear: invoiceMonthFilter.year,
+                  referenceMonth: invoiceMonthFilter.month,
+                },
+              },
+            }
+          : {}),
       },
       include: {
         card: true,
@@ -81,7 +99,10 @@ export default async function PurchasesPage({
     <main className="p-4">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold">Compras</h1>
-        <Link href="/purchases/new" className={buttonVariants()}>
+        <Link
+          href={cardId ? `/purchases/new?cardId=${cardId}` : "/purchases/new"}
+          className={buttonVariants()}
+        >
           Nova compra
         </Link>
       </div>
@@ -89,10 +110,11 @@ export default async function PurchasesPage({
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <CardFilter cards={allCards} />
         <CategoryFilter categories={activeCategories} />
+        <InstallmentsFilter />
         <MonthFilter />
       </div>
 
-      {(filterCard || category || month) && (
+      {(filterCard || category || month || installments) && (
         <p className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           Filtrando por{" "}
           {filterCard && (
@@ -109,8 +131,12 @@ export default async function PurchasesPage({
               {categoryMap.get(category) ?? category}
             </span>
           )}
+          {installments && (
+            <span className="font-medium text-foreground">parceladas</span>
+          )}
           {month && (
             <span className="font-medium text-foreground">
+              fatura de{" "}
               {MONTH_LABEL_FORMATTER.format(new Date(`${month}-01T00:00:00.000Z`))}
             </span>
           )}
@@ -122,8 +148,8 @@ export default async function PurchasesPage({
 
       {purchases.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {filterCard || category || month
-            ? "Nenhuma compra registrada com esse filtro ainda."
+          {filterCard || category || month || installments
+            ? "Nenhuma compra encontrada nessa fatura/filtro ainda."
             : "Nenhuma compra registrada ainda."}
         </p>
       ) : (
@@ -138,6 +164,7 @@ export default async function PurchasesPage({
               totalCents: purchase.totalCents,
               installmentsCount: purchase.installmentsCount,
               ownerUserId: purchase.ownerUserId,
+              chargedUserId: purchase.chargedUserId,
               participants: purchase.participants.map((p) => p.user),
               hasPaidInstallment: purchase.installments.some((i) => i.paid),
             }),
@@ -145,6 +172,7 @@ export default async function PurchasesPage({
           cards={ownedCards}
           categories={allCategories}
           participantCandidates={participantCandidates}
+          currentUserId={user.userId}
         />
       )}
     </main>

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { centsToDisplay } from "@/lib/money";
+import { centsToDisplay, splitPurchaseShare } from "@/lib/money";
 import { InstallmentPreviewTable } from "@/components/installment-preview-table";
 import { BackLink } from "@/components/back-link";
 import { buttonVariants } from "@/components/ui/button";
@@ -36,6 +36,25 @@ export default async function PurchaseDetailPage({
   const otherParticipantNames = purchase.participants
     .filter((p) => p.userId !== purchase.ownerUserId)
     .map((p) => p.user.name);
+  const chargedParticipantName = purchase.chargedUserId
+    ? purchase.participants.find((p) => p.userId === purchase.chargedUserId)?.user
+        .name ?? null
+    : null;
+  const isSharedPurchase = purchase.participants.some(
+    (p) => p.userId !== purchase.ownerUserId
+  );
+  const participantIds = [
+    purchase.ownerUserId,
+    ...purchase.participants
+      .filter((p) => p.userId !== purchase.ownerUserId)
+      .map((p) => p.userId),
+  ];
+  const myShareCents =
+    splitPurchaseShare(
+      purchase.totalCents,
+      participantIds,
+      purchase.chargedUserId
+    )[user.userId] ?? 0;
 
   return (
     <main className="mx-auto max-w-sm p-4">
@@ -45,9 +64,23 @@ export default async function PurchaseDetailPage({
         {purchase.card.name} ·{" "}
         {centsToDisplay(purchase.totalCents, purchase.card.currency)} em{" "}
         {purchase.installmentsCount}x
-        {otherParticipantNames.length > 0 &&
-          ` · Dividida com ${otherParticipantNames.join(", ")}`}
+        {chargedParticipantName
+          ? ` · 100% por ${chargedParticipantName}`
+          : otherParticipantNames.length > 0
+            ? ` · Dividida com ${otherParticipantNames.join(", ")}`
+            : ""}
       </p>
+      {isSharedPurchase && (
+        <p className="mb-4 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+          Minha parte nesta compra:{" "}
+          <span className="font-medium text-foreground">
+            {centsToDisplay(myShareCents, purchase.card.currency)}
+          </span>
+          {chargedParticipantName && myShareCents === 0
+            ? ` · Valor inteiro direcionado para ${chargedParticipantName}.`
+            : ""}
+        </p>
+      )}
 
       <InstallmentPreviewTable
         installments={purchase.installments.map((i) => ({

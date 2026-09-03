@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch, Controller } from "react-hook-form";
 import { toast } from "sonner";
 import { updatePurchase } from "@/lib/actions/purchase-actions";
@@ -14,6 +14,7 @@ import {
   ParticipantPicker,
   type ParticipantCandidate,
 } from "@/components/participant-picker";
+import { PurchaseChargeSelect } from "@/components/purchase-charge-select";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -40,6 +41,7 @@ export interface EditablePurchase {
   purchaseDateISO: string;
   installmentsCount: number;
   additionalParticipantUserIds: string[];
+  chargedUserId: string | null;
   category: string;
   hasPaidInstallment: boolean;
 }
@@ -104,6 +106,7 @@ function PurchaseEditModalForm({
     register,
     handleSubmit,
     control,
+    setValue,
     formState: { isSubmitting },
   } = useForm<UpdatePurchaseInput>({
     defaultValues: {
@@ -113,13 +116,33 @@ function PurchaseEditModalForm({
       purchaseDate: new Date(purchase.purchaseDateISO),
       installmentsCount: purchase.installmentsCount,
       additionalParticipantUserIds: purchase.additionalParticipantUserIds,
+      chargedUserId: purchase.chargedUserId,
       category: purchase.category,
     },
   });
 
   const cardId = useWatch({ control, name: "cardId" });
+  const watchedAdditionalParticipantUserIds = useWatch({
+    control,
+    name: "additionalParticipantUserIds",
+  });
+  const additionalParticipantUserIds = useMemo(
+    () => watchedAdditionalParticipantUserIds ?? [],
+    [watchedAdditionalParticipantUserIds]
+  );
+  const chargedUserId = useWatch({ control, name: "chargedUserId" });
   const selectedCard = cards.find((c) => c.id === cardId);
   const currency = selectedCard?.currency ?? "BRL";
+
+  useEffect(() => {
+    if (
+      chargedUserId &&
+      (additionalParticipantUserIds.length !== 1 ||
+        !additionalParticipantUserIds.includes(chargedUserId))
+    ) {
+      setValue("chargedUserId", null, { shouldDirty: true });
+    }
+  }, [additionalParticipantUserIds, chargedUserId, setValue]);
 
   async function onSubmit(values: UpdatePurchaseInput) {
     setServerError(null);
@@ -302,6 +325,20 @@ function PurchaseEditModalForm({
           )}
         />
       </div>
+
+      <Controller
+        control={control}
+        name="chargedUserId"
+        render={({ field }) => (
+          <PurchaseChargeSelect
+            id="modal-chargedUserId"
+            participantIds={additionalParticipantUserIds}
+            candidates={participantCandidates}
+            value={field.value}
+            onChange={field.onChange}
+          />
+        )}
+      />
 
       {serverError && (
         <p className="text-sm text-red-600" role="alert">

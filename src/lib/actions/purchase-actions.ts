@@ -39,6 +39,37 @@ async function resolveParticipantUserIds(
   return { participantUserIds: [ownerUserId, ...additional] };
 }
 
+function validateChargedUserId(
+  participantUserIds: string[],
+  ownerUserId: string,
+  chargedUserId: string | null
+): { error: string } | { chargedUserId: string | null } {
+  if (!chargedUserId) {
+    return { chargedUserId: null };
+  }
+
+  if (chargedUserId === ownerUserId) {
+    return {
+      error:
+        "Para direcionar 100% da compra, escolha um participante adicional em vez do titular do cartão.",
+    };
+  }
+
+  if (!participantUserIds.includes(chargedUserId)) {
+    return { error: "Participante responsável inválido." };
+  }
+
+  const additionalCount = participantUserIds.filter((id) => id !== ownerUserId).length;
+  if (additionalCount !== 1) {
+    return {
+      error:
+        "Para direcionar 100% da compra para outra pessoa, selecione apenas esse participante.",
+    };
+  }
+
+  return { chargedUserId };
+}
+
 export type CreatePurchaseResult = { error?: string };
 
 export async function createPurchase(
@@ -58,6 +89,7 @@ export async function createPurchase(
     purchaseDate,
     installmentsCount,
     additionalParticipantUserIds,
+    chargedUserId,
     category,
   } = parsed.data;
 
@@ -79,21 +111,33 @@ export async function createPurchase(
   if ("error" in participants) {
     return { error: participants.error };
   }
+  const charged = validateChargedUserId(
+    participants.participantUserIds,
+    user.userId,
+    chargedUserId
+  );
+  if ("error" in charged) {
+    return { error: charged.error };
+  }
 
   const firstMonth = firstInvoiceMonth(purchaseDate, card.closingDay);
   const months = generateInstallmentMonths(firstMonth, installmentsCount);
   const values = splitValue(totalCents, installmentsCount);
+  const normalizedDescription = description.trim() || categoryRecord.name;
 
   await db.$transaction(async (tx) => {
     const purchase = await tx.purchase.create({
       data: {
-        cardId,
-        description,
+        card: { connect: { id: cardId } },
+        description: normalizedDescription,
         category,
         totalCents,
         purchaseDate,
         installmentsCount,
-        ownerUserId: user.userId,
+        owner: { connect: { id: user.userId } },
+        ...(charged.chargedUserId
+          ? { chargedUser: { connect: { id: charged.chargedUserId } } }
+          : {}),
       },
     });
 
@@ -200,6 +244,7 @@ export async function updatePurchase(
     purchaseDate,
     installmentsCount,
     additionalParticipantUserIds,
+    chargedUserId,
     category,
   } = parsed.data;
 
@@ -220,6 +265,14 @@ export async function updatePurchase(
   );
   if ("error" in participants) {
     return { error: participants.error };
+  }
+  const charged = validateChargedUserId(
+    participants.participantUserIds,
+    user.userId,
+    chargedUserId
+  );
+  if ("error" in charged) {
+    return { error: charged.error };
   }
 
   const needsRegeneration =
@@ -247,6 +300,7 @@ export async function updatePurchase(
         purchaseDate,
         installmentsCount,
         ownerUserId: user.userId,
+        chargedUserId: charged.chargedUserId,
       },
     });
 

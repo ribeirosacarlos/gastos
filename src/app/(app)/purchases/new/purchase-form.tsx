@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch, Controller } from "react-hook-form";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import {
   ParticipantPicker,
   type ParticipantCandidate,
 } from "@/components/participant-picker";
+import { PurchaseChargeSelect } from "@/components/purchase-charge-select";
 import { Button } from "@/components/ui/button";
 import { getContrastTextColor } from "@/lib/utils";
 import { DEFAULT_CATEGORY } from "@/lib/categories";
@@ -59,6 +60,8 @@ export function NewPurchaseForm({
     register,
     handleSubmit,
     control,
+    reset,
+    setValue,
     formState: { isSubmitting },
   } = useForm<PurchaseInput>({
     defaultValues: {
@@ -68,13 +71,33 @@ export function NewPurchaseForm({
       purchaseDate: new Date(todayIsoDate()),
       installmentsCount: 1,
       additionalParticipantUserIds: [],
+      chargedUserId: null,
       category: DEFAULT_CATEGORY,
     },
   });
 
   const cardId = useWatch({ control, name: "cardId" });
+  const watchedAdditionalParticipantUserIds = useWatch({
+    control,
+    name: "additionalParticipantUserIds",
+  });
+  const additionalParticipantUserIds = useMemo(
+    () => watchedAdditionalParticipantUserIds ?? [],
+    [watchedAdditionalParticipantUserIds]
+  );
+  const chargedUserId = useWatch({ control, name: "chargedUserId" });
   const selectedCard = cards.find((c) => c.id === cardId);
   const currency = selectedCard?.currency ?? "BRL";
+
+  useEffect(() => {
+    if (
+      chargedUserId &&
+      (additionalParticipantUserIds.length !== 1 ||
+        !additionalParticipantUserIds.includes(chargedUserId))
+    ) {
+      setValue("chargedUserId", null, { shouldDirty: true });
+    }
+  }, [additionalParticipantUserIds, chargedUserId, setValue]);
 
   async function onSubmit(values: PurchaseInput) {
     setServerError(null);
@@ -92,7 +115,16 @@ export function NewPurchaseForm({
     }
 
     toast.success("Compra registrada.");
-    router.push("/purchases");
+    reset({
+      cardId: values.cardId,
+      description: "",
+      totalCents: 0,
+      purchaseDate: new Date(todayIsoDate()),
+      installmentsCount: 1,
+      additionalParticipantUserIds: [],
+      chargedUserId: null,
+      category: DEFAULT_CATEGORY,
+    });
     router.refresh();
   }
 
@@ -145,7 +177,8 @@ export function NewPurchaseForm({
           id="description"
           type="text"
           className="w-full rounded-md border px-3 py-2 text-sm"
-          {...register("description", { required: true })}
+          placeholder="Se vazio, usa o nome da categoria"
+          {...register("description")}
         />
       </div>
 
@@ -246,6 +279,20 @@ export function NewPurchaseForm({
           )}
         />
       </div>
+
+      <Controller
+        control={control}
+        name="chargedUserId"
+        render={({ field }) => (
+          <PurchaseChargeSelect
+            id="chargedUserId"
+            participantIds={additionalParticipantUserIds}
+            candidates={participantCandidates}
+            value={field.value}
+            onChange={field.onChange}
+          />
+        )}
+      />
 
       {serverError && (
         <p className="text-sm text-red-600" role="alert">

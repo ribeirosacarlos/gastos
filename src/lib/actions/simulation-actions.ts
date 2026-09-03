@@ -44,6 +44,7 @@ export async function simulatePurchase(
     where: { id: cardId },
     include: {
       purchases: {
+        where: { isActive: true },
         include: { installments: { where: { paid: false } } },
       },
     },

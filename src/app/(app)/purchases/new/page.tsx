@@ -4,8 +4,13 @@ import { listCategories } from "@/lib/actions/category-actions";
 import { BackLink } from "@/components/back-link";
 import { NewPurchaseForm } from "./purchase-form";
 
-export default async function NewPurchasePage() {
+export default async function NewPurchasePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cardId?: string }>;
+}) {
   const session = await requireUser();
+  const { cardId: rawCardId } = await searchParams;
 
   const [cards, user, participantCandidates, categories] = await Promise.all([
     db.card.findMany({
@@ -16,6 +21,9 @@ export default async function NewPurchasePage() {
     listParticipantCandidates(session.userId),
     listCategories(),
   ]);
+
+  const filterCardId =
+    rawCardId && cards.some((c) => c.id === rawCardId) ? rawCardId : undefined;
 
   return (
     <main className="mx-auto max-w-sm p-4">
@@ -29,7 +37,7 @@ export default async function NewPurchasePage() {
           color: c.color,
         }))}
         categories={categories}
-        defaultCardId={user?.lastUsedCardId ?? undefined}
+        defaultCardId={filterCardId ?? user?.lastUsedCardId ?? undefined}
         participantCandidates={participantCandidates}
       />
     </main>

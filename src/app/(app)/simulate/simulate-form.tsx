@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch, Controller } from "react-hook-form";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ import {
   ParticipantPicker,
   type ParticipantCandidate,
 } from "@/components/participant-picker";
+import { PurchaseChargeSelect } from "@/components/purchase-charge-select";
 import type { CategoryOption } from "@/lib/actions/category-actions";
 
 interface CardOption {
@@ -71,6 +72,7 @@ export function SimulateForm({
     handleSubmit,
     control,
     getValues,
+    setValue,
     formState: { isSubmitting },
   } = useForm<PurchaseInput>({
     defaultValues: {
@@ -80,13 +82,33 @@ export function SimulateForm({
       purchaseDate: new Date(todayIsoDate()),
       installmentsCount: 1,
       additionalParticipantUserIds: [],
+      chargedUserId: null,
       category: DEFAULT_CATEGORY,
     },
   });
 
   const cardId = useWatch({ control, name: "cardId" });
+  const watchedAdditionalParticipantUserIds = useWatch({
+    control,
+    name: "additionalParticipantUserIds",
+  });
+  const additionalParticipantUserIds = useMemo(
+    () => watchedAdditionalParticipantUserIds ?? [],
+    [watchedAdditionalParticipantUserIds]
+  );
+  const chargedUserId = useWatch({ control, name: "chargedUserId" });
   const selectedCard = cards.find((c) => c.id === cardId);
   const currency = selectedCard?.currency ?? "BRL";
+
+  useEffect(() => {
+    if (
+      chargedUserId &&
+      (additionalParticipantUserIds.length !== 1 ||
+        !additionalParticipantUserIds.includes(chargedUserId))
+    ) {
+      setValue("chargedUserId", null, { shouldDirty: true });
+    }
+  }, [additionalParticipantUserIds, chargedUserId, setValue]);
 
   async function handleCalculate(values: PurchaseInput) {
     setServerError(null);
@@ -284,6 +306,20 @@ export function SimulateForm({
             )}
           />
         </div>
+
+        <Controller
+          control={control}
+          name="chargedUserId"
+          render={({ field }) => (
+            <PurchaseChargeSelect
+              id="chargedUserId"
+              participantIds={additionalParticipantUserIds}
+              candidates={participantCandidates}
+              value={field.value}
+              onChange={field.onChange}
+            />
+          )}
+        />
 
         {serverError && (
           <p className="text-sm text-red-600" role="alert">

@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { generateInstallmentMonths, type YearMonth } from "@/lib/dates";
-import { convertToBRL, splitAmongParticipants, userShareCents } from "@/lib/money";
+import { convertToBRL, splitPurchaseShare, userShareCents } from "@/lib/money";
 
 // Ver Dev Notes da Story 1.8: numero de meses da timeline nao vem do plano
 // (que so diz "proximos N meses") - escolha de implementacao razoavel.
@@ -34,6 +34,7 @@ export async function getCardLimits(): Promise<CardLimit[]> {
     where: { ownerUserId: user.userId, isActive: true },
     include: {
       purchases: {
+        where: { isActive: true },
         include: {
           installments: { where: { paid: false } },
         },
@@ -152,7 +153,11 @@ export async function getMonthlyTimeline(
           .filter((userId) => userId !== pi.purchase.ownerUserId),
       ];
       const share =
-        splitAmongParticipants(pi.valueCents, orderedParticipantIds)[
+        splitPurchaseShare(
+          pi.valueCents,
+          orderedParticipantIds,
+          pi.purchase.chargedUserId
+        )[
           user.userId
         ] ?? 0;
       addTo(myTotals, currency, share);

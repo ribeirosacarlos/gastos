@@ -59,7 +59,7 @@ export type CardInput = z.infer<typeof cardSchema>;
 
 export const purchaseSchema = z.object({
   cardId: z.string().min(1, "Selecione um cartão"),
-  description: z.string().min(1, "Informe a descrição"),
+  description: z.string(),
   totalCents: z.coerce
     .number()
     .int("Valor deve ser um valor inteiro (em centavos)")
@@ -72,6 +72,12 @@ export const purchaseSchema = z.object({
   // IDs de usuarios que dividem a compra alem do dono (que e sempre
   // implicito - nunca aparece nesta lista). Vazio = compra nao dividida.
   additionalParticipantUserIds: z.array(z.string().min(1)).default([]),
+  // null = divide igualmente entre os participantes; preenchido = 100% vai
+  // para esse participante adicional.
+  chargedUserId: z.preprocess(
+    (value) => (value === "" || value === undefined ? null : value),
+    z.string().min(1).nullable()
+  ),
   // Validado contra a tabela Category na action (mesmo padrao de cardId),
   // nao da pra usar z.enum aqui porque a lista e dinamica.
   category: z.string().min(1, "Selecione uma categoria"),
@@ -79,10 +85,9 @@ export const purchaseSchema = z.object({
 
 export type PurchaseInput = z.infer<typeof purchaseSchema>;
 
-// Mesmos campos de purchaseSchema - a diferenca entre criar e editar fica na
-// action (updatePurchase bloqueia regeneracao de installments se ja houver
-// parcela paga; ver Dev Notes da Story 1.14), nao no shape validado.
-export const updatePurchaseSchema = purchaseSchema;
+export const updatePurchaseSchema = purchaseSchema.extend({
+  description: z.string().trim().min(1, "Informe a descrição"),
+});
 
 export type UpdatePurchaseInput = z.infer<typeof updatePurchaseSchema>;
 

@@ -5,7 +5,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-full md:pl-48">
       <SidebarNav />
-      <div className="mx-auto max-w-2xl pb-20 md:pb-4">{children}</div>
+      <div className="mx-auto max-w-2xl pb-20 md:max-w-4xl md:pb-4 lg:max-w-6xl">
+        {children}
+      </div>
       <BottomNav />
     </div>
   );

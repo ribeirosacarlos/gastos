@@ -67,3 +67,24 @@ export function splitAmongParticipants(
   const shares = splitValue(valueCents, orderedUserIds.length);
   return Object.fromEntries(orderedUserIds.map((userId, i) => [userId, shares[i]]));
 }
+
+// Regras de rateio de Purchase:
+// - chargedUserId = null  -> divide igualmente entre os participantes
+// - chargedUserId != null -> 100% do valor vai para esse usuario
+export function splitPurchaseShare(
+  valueCents: number,
+  orderedUserIds: string[],
+  chargedUserId?: string | null
+): Record<string, number> {
+  if (!chargedUserId) {
+    return splitAmongParticipants(valueCents, orderedUserIds);
+  }
+
+  if (!orderedUserIds.includes(chargedUserId)) {
+    throw new Error("chargedUserId precisa ser um participante da compra");
+  }
+
+  return Object.fromEntries(
+    orderedUserIds.map((userId) => [userId, userId === chargedUserId ? valueCents : 0])
+  );
+}

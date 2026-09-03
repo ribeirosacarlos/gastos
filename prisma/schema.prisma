@@ -21,6 +21,7 @@ model User {
 
   ownedCards         Card[]         @relation("CardOwner")
   ownedPurchases     Purchase[]     @relation("PurchaseOwner")
+  chargedPurchases   Purchase[]     @relation("PurchaseChargedUser")
   ownedFixedExpenses FixedExpense[] @relation("FixedExpenseOwner")
   purchaseParticipations PurchaseParticipant[] @relation("PurchaseParticipant")
 }
@@ -67,6 +68,11 @@ model Purchase {
   // na camada de aplicacao).
   ownerUserId       String
   owner             User     @relation("PurchaseOwner", fields: [ownerUserId], references: [id])
+  // null = divide igualmente entre os participantes; preenchido = essa
+  // pessoa (um participante adicional) paga 100% da compra, mesmo com o
+  // cartao sendo do ownerUserId.
+  chargedUserId     String?
+  chargedUser       User?    @relation("PurchaseChargedUser", fields: [chargedUserId], references: [id])
   // Soft-delete: false = excluida, some das listagens/totais. Mesmo padrao
   // de Card.isActive/FixedExpense.isActive (Story 1.14).
   isActive          Boolean  @default(true)
