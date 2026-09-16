@@ -8,11 +8,13 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# --- build: gera o client de producao (Postgres) e o build standalone ---
+# --- build: gera os dois clients (src/lib/db.ts importa ambos de forma
+# estatica, mesmo so usando um em runtime) e o build standalone ---
 FROM base AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN npx prisma generate
 RUN npx prisma generate --config=prisma.config.production.ts
 RUN npm run build
 
