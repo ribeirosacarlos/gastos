@@ -4,6 +4,7 @@
 .env
 .env.local
 .env.*.local
+.env.production
 *.key
 *.pem
 
@@ -39,6 +40,9 @@ prisma/dev.db-journal
 *.db
 *.db-journal
 
+# Backups de banco (dados reais - nunca versionar)
+/backups/
+
 # Testing
 coverage/
 .nyc_output/
@@ -49,3 +53,4 @@ temp/
 *.tmp
 
 /src/generated/prisma
+/src/generated/prisma-production

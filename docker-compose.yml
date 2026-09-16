@@ -1,0 +1,71 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gastos
+      POSTGRES_USER: gastos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - gastos_db_data:/var/lib/postgresql/data
+    networks:
+      - gastos
+    mem_limit: 512m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gastos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Roda `prisma migrate deploy` a cada `docker compose up` (idempotente - so
+  # aplica migrations pendentes) e sai. Tambem usado para o restore manual do
+  # backup (docker compose run --rm migrate npx tsx scripts/restore-db.ts ...).
+  migrate:
+    build:
+      context: .
+      target: build
+    command: npx prisma migrate deploy --config=prisma.config.production.ts
+    environment:
+      DATABASE_URL: postgresql://gastos:${POSTGRES_PASSWORD}@db:5432/gastos
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - gastos
+    restart: "no"
+
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    environment:
+      DATABASE_PROVIDER: postgresql
+      DATABASE_URL: postgresql://gastos:${POSTGRES_PASSWORD}@db:5432/gastos
+      SESSION_SECRET: ${SESSION_SECRET}
+      SEED_USER1_USERNAME: ${SEED_USER1_USERNAME}
+      SEED_USER1_PASSWORD: ${SEED_USER1_PASSWORD}
+      SEED_USER1_NAME: ${SEED_USER1_NAME}
+      SEED_USER2_USERNAME: ${SEED_USER2_USERNAME}
+      SEED_USER2_PASSWORD: ${SEED_USER2_PASSWORD}
+      SEED_USER2_NAME: ${SEED_USER2_NAME}
+      PLUGGY_CLIENT_ID: ${PLUGGY_CLIENT_ID}
+      PLUGGY_CLIENT_SECRET: ${PLUGGY_CLIENT_SECRET}
+    ports:
+      # Sem dominio ainda - acesso direto via IP:3001. Trocar por proxy
+      # nginx (sem publicar porta no host) quando tiver dominio.
+      - "3001:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - gastos
+    mem_limit: 512m
+    cpus: 0.5
+
+networks:
+  gastos:
+    name: gastos
+
+volumes:
+  gastos_db_data:

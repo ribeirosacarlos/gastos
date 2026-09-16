@@ -1,0 +1,137 @@
+// Schema de PRODUCAO (Postgres). Espelha prisma/schema.prisma (SQLite, usado
+// no dev local) model a model - qualquer mudanca de campo precisa ser feita
+// nos dois arquivos. Migrations ficam em prisma/migrations-production.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma-production"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  username       String   @unique
+  passwordHash   String
+  lastUsedCardId String?
+  lastUsedCard   Card?    @relation("UserLastUsedCard", fields: [lastUsedCardId], references: [id])
+  createdAt      DateTime @default(now())
+
+  ownedCards         Card[]         @relation("CardOwner")
+  ownedPurchases     Purchase[]     @relation("PurchaseOwner")
+  chargedPurchases   Purchase[]     @relation("PurchaseChargedUser")
+  ownedFixedExpenses FixedExpense[] @relation("FixedExpenseOwner")
+  purchaseParticipations PurchaseParticipant[] @relation("PurchaseParticipant")
+}
+
+model Card {
+  id          String   @id @default(cuid())
+  name        String
+  bank        String
+  limitCents  Int
+  currency    String   @default("BRL")
+  color       String   @default("#64748b")
+  closingDay  Int
+  dueDay      Int
+  ownerUserId String
+  owner       User     @relation("CardOwner", fields: [ownerUserId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  purchases    Purchase[]
+  lastUsedByUsers User[] @relation("UserLastUsedCard")
+}
+
+model Purchase {
+  id                String   @id @default(cuid())
+  cardId            String
+  card              Card     @relation(fields: [cardId], references: [id])
+  description       String
+  totalCents        Int
+  purchaseDate      DateTime
+  installmentsCount Int
+  category          String   @default("other")
+  ownerUserId       String
+  owner             User     @relation("PurchaseOwner", fields: [ownerUserId], references: [id])
+  chargedUserId     String?
+  chargedUser       User?    @relation("PurchaseChargedUser", fields: [chargedUserId], references: [id])
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  installments PurchaseInstallment[]
+  participants PurchaseParticipant[]
+}
+
+model PurchaseParticipant {
+  id         String   @id @default(cuid())
+  purchaseId String
+  purchase   Purchase @relation(fields: [purchaseId], references: [id])
+  userId     String
+  user       User     @relation("PurchaseParticipant", fields: [userId], references: [id])
+
+  @@unique([purchaseId, userId])
+}
+
+model PurchaseInstallment {
+  id                String    @id @default(cuid())
+  purchaseId        String
+  purchase          Purchase  @relation(fields: [purchaseId], references: [id])
+  installmentNumber Int
+  referenceYear     Int
+  referenceMonth    Int
+  valueCents        Int
+  paid              Boolean   @default(false)
+  paidAt            DateTime?
+
+  @@unique([purchaseId, installmentNumber])
+  @@index([referenceYear, referenceMonth])
+}
+
+model FixedExpense {
+  id          String   @id @default(cuid())
+  description String
+  valueCents  Int
+  currency    String   @default("BRL")
+  category    String   @default("other")
+  startYear   Int
+  startMonth  Int
+  totalInstallments Int?
+  isShared    Boolean  @default(false)
+  ownerUserId String?
+  owner       User?    @relation("FixedExpenseOwner", fields: [ownerUserId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  installments FixedExpenseInstallment[]
+}
+
+model FixedExpenseInstallment {
+  id                String    @id @default(cuid())
+  fixedExpenseId    String
+  fixedExpense      FixedExpense @relation(fields: [fixedExpenseId], references: [id])
+  installmentNumber Int
+  referenceYear     Int
+  referenceMonth    Int
+  valueCents        Int
+  paid              Boolean   @default(false)
+  paidAt            DateTime?
+
+  @@unique([fixedExpenseId, referenceYear, referenceMonth])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model ExchangeRate {
+  id        String   @id @default(cuid())
+  currency  String   @unique
+  rateToBRL Float
+  source    String
+  updatedAt DateTime @updatedAt
+}
