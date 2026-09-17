@@ -3,8 +3,11 @@ export interface YearMonth {
   month: number; // 1-12
 }
 
-// Se o dia da compra <= closingDay, cai na fatura do mes corrente da compra.
-// Se > closingDay, cai no mes seguinte.
+// Se o dia da compra < closingDay, cai na fatura do mes corrente da compra.
+// Se >= closingDay (incluindo o proprio dia do fechamento), cai no mes
+// seguinte - confirmado contra faturas reais (Nubank fechamento dia 5,
+// Santander dia 1: compras feitas exatamente nesse dia sempre apareceram
+// na fatura seguinte, nunca na do mes corrente).
 export function firstInvoiceMonth(
   purchaseDate: Date,
   closingDay: number
@@ -13,7 +16,7 @@ export function firstInvoiceMonth(
   const year = purchaseDate.getFullYear();
   const month = purchaseDate.getMonth() + 1; // 1-12
 
-  if (day <= closingDay) {
+  if (day < closingDay) {
     return { year, month };
   }
 
