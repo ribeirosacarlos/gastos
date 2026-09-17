@@ -7,6 +7,7 @@ import {
   getMonthlyTimeline,
   getCombinedBRLTotal,
   getActiveCardColors,
+  payCardInvoice,
 } from "@/lib/actions/dashboard-actions";
 import { UserBadge } from "@/components/user-badge";
 import { LimitProgressBar } from "@/components/limit-progress-bar";
@@ -195,7 +196,11 @@ export default async function DashboardPage() {
         ) : (
           <div className="grid grid-cols-2 gap-2">
             {cardLimits.map((card) => (
-              <LimitProgressBar key={card.cardId} card={card} />
+              <LimitProgressBar
+                key={card.cardId}
+                card={card}
+                onPayInvoice={payCardInvoice}
+              />
             ))}
           </div>
         )}

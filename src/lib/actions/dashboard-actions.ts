@@ -1,8 +1,14 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { generateInstallmentMonths, type YearMonth } from "@/lib/dates";
+import {
+  addMonths,
+  firstInvoiceMonth,
+  generateInstallmentMonths,
+  type YearMonth,
+} from "@/lib/dates";
 import { convertToBRL, splitPurchaseShare, userShareCents } from "@/lib/money";
 
 // Ver Dev Notes da Story 1.8: numero de meses da timeline nao vem do plano
@@ -22,6 +28,22 @@ export interface CardLimit {
   limitCents: number;
   usedCents: number;
   availableCents: number;
+  // Fatura mais recente ja fechada (closingDay passou), que e a que se paga
+  // agora - ver dueInvoiceMonth() abaixo. totalCents inclui parcelas ja
+  // pagas (pra exibir o valor da fatura); unpaidCents e o que falta pagar.
+  dueInvoiceYear: number;
+  dueInvoiceMonth: number;
+  dueInvoiceTotalCents: number;
+  dueInvoiceUnpaidCents: number;
+}
+
+// A fatura "corrente" pra fins de compra (firstInvoiceMonth) e a que ainda
+// esta aberta, acumulando; a que se paga agora e a anterior a essa (ja
+// fechou no closingDay deste ciclo). Ex.: closingDay=10, hoje dia 15 ->
+// firstInvoiceMonth retorna o mes que vem (aberta) -> fatura devida = mes
+// atual (fechou hoje ha 5 dias).
+function dueInvoiceMonth(today: Date, closingDay: number): YearMonth {
+  return addMonths(firstInvoiceMonth(today, closingDay), -1);
 }
 
 // usedCents e a soma bruta das parcelas nao pagas no cartao - o limite e
@@ -29,6 +51,7 @@ export interface CardLimit {
 // "pagar" depois (isShared nao entra aqui, ver AC 2 da Story 1.8).
 export async function getCardLimits(): Promise<CardLimit[]> {
   const user = await requireUser();
+  const now = new Date();
 
   const cards = await db.card.findMany({
     where: { ownerUserId: user.userId, isActive: true },
@@ -36,18 +59,29 @@ export async function getCardLimits(): Promise<CardLimit[]> {
       purchases: {
         where: { isActive: true },
         include: {
-          installments: { where: { paid: false } },
+          installments: true,
         },
       },
     },
   });
 
   return cards.map((card) => {
-    const usedCents = card.purchases.reduce(
-      (sum, p) =>
-        sum + p.installments.reduce((s, i) => s + i.valueCents, 0),
-      0
-    );
+    const dueMonth = dueInvoiceMonth(now, card.closingDay);
+
+    let usedCents = 0;
+    let dueInvoiceTotalCents = 0;
+    let dueInvoiceUnpaidCents = 0;
+
+    for (const p of card.purchases) {
+      for (const i of p.installments) {
+        if (!i.paid) usedCents += i.valueCents;
+
+        if (i.referenceYear === dueMonth.year && i.referenceMonth === dueMonth.month) {
+          dueInvoiceTotalCents += i.valueCents;
+          if (!i.paid) dueInvoiceUnpaidCents += i.valueCents;
+        }
+      }
+    }
 
     return {
       cardId: card.id,
@@ -57,8 +91,41 @@ export async function getCardLimits(): Promise<CardLimit[]> {
       limitCents: card.limitCents,
       usedCents,
       availableCents: card.limitCents - usedCents,
+      dueInvoiceYear: dueMonth.year,
+      dueInvoiceMonth: dueMonth.month,
+      dueInvoiceTotalCents,
+      dueInvoiceUnpaidCents,
     };
   });
+}
+
+export type PayCardInvoiceResult = { error?: string };
+
+// Marca como paga toda parcela da fatura devida (fechada, ainda nao paga)
+// do cartao - libera o limite na hora, ja que getCardLimits() so soma
+// parcelas com paid:false.
+export async function payCardInvoice(cardId: string): Promise<PayCardInvoiceResult> {
+  const user = await requireUser();
+
+  const card = await db.card.findUnique({ where: { id: cardId } });
+  if (!card || card.ownerUserId !== user.userId) {
+    return { error: "Cartão não encontrado." };
+  }
+
+  const dueMonth = dueInvoiceMonth(new Date(), card.closingDay);
+
+  await db.purchaseInstallment.updateMany({
+    where: {
+      paid: false,
+      referenceYear: dueMonth.year,
+      referenceMonth: dueMonth.month,
+      purchase: { cardId, isActive: true },
+    },
+    data: { paid: true, paidAt: new Date() },
+  });
+
+  revalidatePath("/dashboard");
+  return {};
 }
 
 export interface MonthlyTotal {
