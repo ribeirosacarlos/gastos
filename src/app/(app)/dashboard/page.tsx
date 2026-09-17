@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { centsToDisplay } from "@/lib/money";
@@ -9,8 +10,10 @@ import {
   getActiveCardColors,
   payCardInvoice,
 } from "@/lib/actions/dashboard-actions";
+import { getPayablePeopleDueSummary, getPayablesTimelineSummary } from "@/lib/actions/payable-actions";
 import { UserBadge } from "@/components/user-badge";
 import { LimitProgressBar } from "@/components/limit-progress-bar";
+import { PayableCardSummaryCard } from "@/components/payable-card-summary";
 import {
   MonthTimelineChart,
   FIXED_EXPENSES_COLOR,
@@ -23,17 +26,28 @@ export default async function DashboardPage() {
 
   await ensureRollingInstallments();
 
-  const [cardLimits, timeline, cardColors, categories] = await Promise.all([
-    getCardLimits(),
-    getMonthlyTimeline(),
-    getActiveCardColors(),
-    db.category.findMany({ select: { id: true, name: true } }),
-  ]);
+  const [cardLimits, timeline, cardColors, categories, payablePeople, payablesTimeline] =
+    await Promise.all([
+      getCardLimits(),
+      getMonthlyTimeline(),
+      getActiveCardColors(),
+      db.category.findMany({ select: { id: true, name: true } }),
+      getPayablePeopleDueSummary(),
+      // Mesma janela de 6 meses de getMonthlyTimeline() (sem filtro de
+      // categoria) - so pra extrair a divisao por pessoa (byPerson) de
+      // cartao de terceiro, que byCard (abaixo) ja soma no total "Meu
+      // total" mas sem virar segmento visivel no grafico.
+      getPayablesTimelineSummary(),
+    ]);
   const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
 
   const monthBars: MonthBarData[] = await Promise.all(
     timeline.map(async (m) => {
-      const [cardSegments, fixedBRL] = await Promise.all([
+      const payableMonth = payablesTimeline.months.find(
+        (pm) => pm.year === m.year && pm.month === m.month
+      );
+
+      const [cardSegments, payableSegments, fixedBRL] = await Promise.all([
         Promise.all(
           cardColors.map(async (card) => {
             const cents = m.byCard[card.id] ?? 0;
@@ -49,6 +63,24 @@ export default async function DashboardPage() {
             };
           })
         ),
+        // Um segmento por PESSOA (nao por cartao) pro que devo em cartao de
+        // terceiro nesse mes - ex.: "Carlos" agrupando todos os cartoes dele
+        // compartilhados comigo, pra bater com a tela /payable.
+        Promise.all(
+          payablesTimeline.people.map(async (person) => {
+            const currencyMap = payableMonth?.byPerson[person.userId] ?? {};
+            const result =
+              Object.keys(currencyMap).length > 0
+                ? await getCombinedBRLTotal(currencyMap)
+                : { totalBRLCents: 0 };
+            return {
+              key: `payable-${person.userId}`,
+              label: person.name,
+              color: person.color,
+              valueBRLCents: result.totalBRLCents,
+            };
+          })
+        ),
         getCombinedBRLTotal(m.breakdown.fixedExpenses),
       ]);
 
@@ -57,6 +89,7 @@ export default async function DashboardPage() {
         month: m.month,
         segments: [
           ...cardSegments,
+          ...payableSegments,
           {
             key: FIXED_EXPENSES_KEY,
             label: "Fixos",
@@ -68,26 +101,22 @@ export default async function DashboardPage() {
     })
   );
 
-  // Total combinado do periodo inteiro (soma dos meses da timeline) - "meu"
-  // (com split aplicado) e "do casal" (bruto), conforme AC 3/4 da Story 1.8.
+  // Total combinado do periodo inteiro (soma dos meses da timeline) - minha
+  // parte, com split aplicado.
   const myPeriodTotals: Record<string, number> = {};
-  const couplePeriodTotals: Record<string, number> = {};
   for (const m of timeline) {
     for (const [currency, cents] of Object.entries(m.myTotals)) {
       myPeriodTotals[currency] = (myPeriodTotals[currency] ?? 0) + cents;
     }
-    for (const [currency, cents] of Object.entries(m.coupleTotals)) {
-      couplePeriodTotals[currency] = (couplePeriodTotals[currency] ?? 0) + cents;
-    }
   }
 
-  const [myCombined, coupleCombined] = await Promise.all([
-    getCombinedBRLTotal(myPeriodTotals),
-    getCombinedBRLTotal(couplePeriodTotals),
-  ]);
+  const myCombined = await getCombinedBRLTotal(myPeriodTotals);
 
   const ignoredCurrencies = Array.from(
-    new Set([...myCombined.ignoredCurrencies, ...coupleCombined.ignoredCurrencies])
+    new Set([
+      ...myCombined.ignoredCurrencies,
+      ...payablePeople.flatMap((person) => person.ignoredCurrencies),
+    ])
   );
 
   // Agrega byCategory de todos os meses do periodo (categoria -> moeda ->
@@ -149,19 +178,11 @@ export default async function DashboardPage() {
         <MonthTimelineChart data={monthBars} />
       </section>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-lg border p-4">
-          <p className="text-xs text-muted-foreground">Meu total (≈ BRL)</p>
-          <p className="text-lg font-semibold">
-            {centsToDisplay(myCombined.totalBRLCents, "BRL")}
-          </p>
-        </div>
-        <div className="rounded-lg border p-4">
-          <p className="text-xs text-muted-foreground">Total do casal (≈ BRL)</p>
-          <p className="text-lg font-semibold">
-            {centsToDisplay(coupleCombined.totalBRLCents, "BRL")}
-          </p>
-        </div>
+      <section className="rounded-lg border p-4">
+        <p className="text-xs text-muted-foreground">Meu total (≈ BRL)</p>
+        <p className="text-lg font-semibold">
+          {centsToDisplay(myCombined.totalBRLCents, "BRL")}
+        </p>
       </section>
 
       {sortedCategoryBreakdown.length > 0 && (
@@ -182,6 +203,21 @@ export default async function DashboardPage() {
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {payablePeople.length > 0 && (
+        <section>
+          <div className="mb-2 flex items-center justify-end">
+            <Link href="/payable" className="text-xs underline">
+              ver tudo
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {payablePeople.map((person) => (
+              <PayableCardSummaryCard key={person.ownerUserId} person={person} />
+            ))}
+          </div>
         </section>
       )}
 

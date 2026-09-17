@@ -158,12 +158,18 @@ export default async function PurchasesPage({
             (purchase): PurchaseRow => ({
               id: purchase.id,
               cardId: purchase.cardId,
+              cardName: purchase.card.name,
+              cardColor: purchase.card.color,
+              cardCurrency: purchase.card.currency,
               description: purchase.description,
               purchaseDateISO: purchase.purchaseDate.toISOString(),
               category: purchase.category,
               totalCents: purchase.totalCents,
               installmentsCount: purchase.installmentsCount,
               ownerUserId: purchase.ownerUserId,
+              ownerName:
+                purchase.participants.find((p) => p.userId === purchase.ownerUserId)?.user
+                  .name ?? "—",
               chargedUserId: purchase.chargedUserId,
               participants: purchase.participants.map((p) => p.user),
               hasPaidInstallment: purchase.installments.some((i) => i.paid),

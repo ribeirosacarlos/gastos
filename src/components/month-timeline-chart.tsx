@@ -1,4 +1,8 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import { centsToDisplay } from "@/lib/money";
+import { cn } from "@/lib/utils";
 
 const MONTH_LABELS = [
   "Jan",
@@ -83,11 +87,31 @@ function buildLegend(data: MonthBarData[]): LegendEntry[] {
 // height:% so funciona com container de altura definida (o pai teria
 // altura "auto" sem isso, por causa do items-end no container das colunas).
 export function MonthTimelineChart({ data }: MonthTimelineChartProps) {
+  // Legenda clicavel - clicar num item (ex.: "Carlos") esconde a serie
+  // correspondente das barras, sem mexer nos dados recebidos via prop
+  // (so estado local de UI, reseta ao trocar de pagina).
+  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
+
+  const legend = useMemo(() => buildLegend(data), [data]);
+
+  function toggleKey(key: string) {
+    setHiddenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
   const totals = data.map((d) =>
-    d.segments.reduce((sum, s) => sum + s.valueBRLCents, 0)
+    d.segments
+      .filter((s) => !hiddenKeys.has(s.key))
+      .reduce((sum, s) => sum + s.valueBRLCents, 0)
   );
   const maxTotal = Math.max(1, ...totals);
-  const legend = buildLegend(data);
 
   return (
     <div>
@@ -109,7 +133,7 @@ export function MonthTimelineChart({ data }: MonthTimelineChartProps) {
                 style={{ height: `${heightPercent}%`, minHeight: total > 0 ? 4 : 0 }}
               >
                 {d.segments
-                  .filter((seg) => seg.valueBRLCents > 0)
+                  .filter((seg) => !hiddenKeys.has(seg.key) && seg.valueBRLCents > 0)
                   .map((seg) => (
                     <div
                       key={seg.key}
@@ -131,16 +155,29 @@ export function MonthTimelineChart({ data }: MonthTimelineChartProps) {
       </div>
 
       {legend.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          {legend.map((entry) => (
-            <span key={entry.key} className="flex items-center gap-1.5">
-              <span
-                className="inline-block h-2.5 w-2.5 rounded-sm"
-                style={{ backgroundColor: entry.color }}
-              />
-              {entry.label} ({entry.percent.toFixed(0)}%)
-            </span>
-          ))}
+        <div className="mt-3 flex flex-wrap gap-x-1 gap-y-1 text-xs text-muted-foreground">
+          {legend.map((entry) => {
+            const isHidden = hiddenKeys.has(entry.key);
+            return (
+              <button
+                key={entry.key}
+                type="button"
+                onClick={() => toggleKey(entry.key)}
+                aria-pressed={!isHidden}
+                title={isHidden ? `Mostrar ${entry.label}` : `Ocultar ${entry.label}`}
+                className={cn(
+                  "flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-muted",
+                  isHidden && "line-through opacity-50"
+                )}
+              >
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-sm"
+                  style={{ backgroundColor: entry.color }}
+                />
+                {entry.label} ({entry.percent.toFixed(0)}%)
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

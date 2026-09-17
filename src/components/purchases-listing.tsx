@@ -24,12 +24,23 @@ import { toast } from "sonner";
 export interface PurchaseRow {
   id: string;
   cardId: string;
+  // Denormalizado do Card no momento da query - usado como fallback de
+  // exibicao quando o cartao NAO e um dos meus (compra de cartao
+  // compartilhado por outra pessoa), ja que `cards` (prop) so traz os
+  // cartoes do usuario atual (necessario pro seletor de edicao).
+  cardName: string;
+  cardColor: string;
+  cardCurrency: string;
   description: string;
   purchaseDateISO: string;
   category: string;
   totalCents: number;
   installmentsCount: number;
   ownerUserId: string;
+  // Nome de quem "passou" a compra (dono do cartao) - denormalizado igual
+  // cardName/cardColor, pro mesmo caso de cartao compartilhado por outra
+  // pessoa (o dono nem sempre e o usuario atual).
+  ownerName: string;
   chargedUserId: string | null;
   participants: ParticipantCandidate[];
   hasPaidInstallment: boolean;
@@ -81,6 +92,37 @@ function paymentLabel(row: PurchaseRow): string | null {
 
 function isSharedPurchase(row: PurchaseRow): boolean {
   return otherParticipants(row).length > 0;
+}
+
+// Minha parte de CADA parcela (nao so da compra inteira) - recalcula a
+// partir do total, mesma logica de installmentValueLabel, pra nao depender
+// de PurchaseInstallment.valueCents (que a query da listagem nao traz).
+// A ultima parcela pode ter 1-2 centavos a mais (ver splitValue em
+// money.ts), entao a minha parte tambem pode variar entre parcelas.
+function installmentShareLabel(
+  row: PurchaseRow,
+  currentUserId: string,
+  currency: string
+): string | null {
+  if (row.installmentsCount <= 1 || !isSharedPurchase(row)) return null;
+
+  const participantIds = [
+    row.ownerUserId,
+    ...otherParticipants(row).map((p) => p.id),
+  ];
+  const installmentValues = splitValue(row.totalCents, row.installmentsCount);
+  const shares = installmentValues.map(
+    (value) =>
+      splitPurchaseShare(value, participantIds, row.chargedUserId)[currentUserId] ?? 0
+  );
+  const firstShare = shares[0];
+  const lastShare = shares[shares.length - 1];
+
+  if (firstShare === lastShare) {
+    return `${centsToDisplay(firstShare, currency)}/parcela`;
+  }
+
+  return `${centsToDisplay(firstShare, currency)}/parcela (últ. ${centsToDisplay(lastShare, currency)})`;
 }
 
 type SortKey = "purchaseDate" | "description" | "cardName" | "categoryLabel" | "totalCents";
@@ -163,13 +205,20 @@ export function PurchasesListing({
       rows.map((row) => {
         const card = cardsById.get(row.cardId);
         const category = categoriesById.get(row.category);
+        const cardCurrency = card?.currency ?? row.cardCurrency;
+        // Compra de cartao de outra pessoa: mostra o nome DELA em vez do
+        // nome do cartao dela na coluna "Cartao" - nao preciso saber que o
+        // cartao dela se chama "C6 Letícia", so quem fez a compra.
+        const isOwnPurchase = row.ownerUserId === currentUserId;
         return {
           ...row,
-          cardName: card?.name ?? "—",
-          cardColor: card?.color ?? "#64748b",
-          cardCurrency: card?.currency ?? "BRL",
+          cardName: isOwnPurchase ? (card?.name ?? row.cardName) : row.ownerName,
+          cardColor: card?.color ?? row.cardColor,
+          cardCurrency,
           categoryLabel: category?.name ?? row.category,
+          isOwnPurchase,
           myShareCents: rowShareCents(row, currentUserId),
+          installmentShareLabel: installmentShareLabel(row, currentUserId, cardCurrency),
         };
       }),
     [rows, cardsById, categoriesById, currentUserId],
@@ -472,6 +521,7 @@ export function PurchasesListing({
                           row.cardCurrency
                         )}`
                       : ""}
+                    {row.installmentShareLabel && ` (minha parte: ${row.installmentShareLabel})`}
                   </span>
                 </div>
                 {isSharedPurchase(row) && (
@@ -547,7 +597,9 @@ interface CellProps {
     cardColor: string;
     cardCurrency: string;
     categoryLabel: string;
+    isOwnPurchase: boolean;
     myShareCents: number;
+    installmentShareLabel: string | null;
   };
   editing: boolean;
   onStartEdit: () => void;
@@ -622,7 +674,10 @@ function CardCell({
   onCancel,
   onSave,
 }: CellProps & { cards: EditableCardOption[] }) {
-  if (editing) {
+  // Compra de cartao de outra pessoa nao pode ser editada aqui (a action
+  // exige que o cartao pertenca ao usuario atual) - celula so mostra o
+  // nome de quem comprou, sem entrar em modo de edicao.
+  if (editing && row.isOwnPurchase) {
     return (
       <td className="p-1" onClick={(e) => e.stopPropagation()}>
         <select
@@ -648,8 +703,12 @@ function CardCell({
 
   return (
     <td
-      className="cursor-pointer px-3 py-2 hover:bg-muted/40"
+      className={cn(
+        "px-3 py-2",
+        row.isOwnPurchase && "cursor-pointer hover:bg-muted/40"
+      )}
       onClick={(e) => {
+        if (!row.isOwnPurchase) return;
         e.stopPropagation();
         onStartEdit();
       }}
@@ -743,6 +802,9 @@ function ValorCell({ row, editing, onStartEdit, onCancel, onSave }: CellProps) {
             </span>
           </div>
         )}
+        {row.installmentShareLabel && (
+          <div className="text-xs">minha parte: {row.installmentShareLabel}</div>
+        )}
         {isSharedPurchase(row) && (
           <div className="text-xs">
             Minha parte: {centsToDisplay(row.myShareCents, row.cardCurrency)}
@@ -794,6 +856,11 @@ function ValorCell({ row, editing, onStartEdit, onCancel, onSave }: CellProps) {
               row.cardCurrency
             )}
           </span>
+        </div>
+      )}
+      {row.installmentShareLabel && (
+        <div className="text-xs text-muted-foreground">
+          minha parte: {row.installmentShareLabel}
         </div>
       )}
       {isSharedPurchase(row) && (

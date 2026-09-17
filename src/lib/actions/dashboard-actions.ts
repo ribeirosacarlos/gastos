@@ -4,8 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import {
-  addMonths,
-  firstInvoiceMonth,
+  dueInvoiceMonth,
   generateInstallmentMonths,
   type YearMonth,
 } from "@/lib/dates";
@@ -35,15 +34,6 @@ export interface CardLimit {
   dueInvoiceMonth: number;
   dueInvoiceTotalCents: number;
   dueInvoiceUnpaidCents: number;
-}
-
-// A fatura "corrente" pra fins de compra (firstInvoiceMonth) e a que ainda
-// esta aberta, acumulando; a que se paga agora e a anterior a essa (ja
-// fechou no closingDay deste ciclo). Ex.: closingDay=10, hoje dia 15 ->
-// firstInvoiceMonth retorna o mes que vem (aberta) -> fatura devida = mes
-// atual (fechou hoje ha 5 dias).
-function dueInvoiceMonth(today: Date, closingDay: number): YearMonth {
-  return addMonths(firstInvoiceMonth(today, closingDay), -1);
 }
 
 // usedCents e a soma bruta das parcelas nao pagas no cartao - o limite e
@@ -132,7 +122,6 @@ export interface MonthlyTotal {
   year: number;
   month: number;
   myTotals: Record<string, number>;
-  coupleTotals: Record<string, number>;
   breakdown: {
     purchases: Record<string, number>;
     fixedExpenses: Record<string, number>;
@@ -202,7 +191,6 @@ export async function getMonthlyTimeline(
 
   return months.map((m) => {
     const myTotals: Record<string, number> = {};
-    const coupleTotals: Record<string, number> = {};
     const breakdownPurchases: Record<string, number> = {};
     const breakdownFixedExpenses: Record<string, number> = {};
     const byCard: Record<string, number> = {};
@@ -228,7 +216,6 @@ export async function getMonthlyTimeline(
           user.userId
         ] ?? 0;
       addTo(myTotals, currency, share);
-      addTo(coupleTotals, currency, pi.valueCents);
       addTo(breakdownPurchases, currency, share);
       addTo(byCard, pi.purchase.cardId, share);
       addToCategory(byCategory, pi.purchase.category, currency, share);
@@ -239,7 +226,6 @@ export async function getMonthlyTimeline(
       const currency = fi.fixedExpense.currency;
       const share = userShareCents(fi.valueCents, fi.fixedExpense.isShared);
       addTo(myTotals, currency, share);
-      addTo(coupleTotals, currency, fi.valueCents);
       addTo(breakdownFixedExpenses, currency, share);
       addToCategory(byCategory, fi.fixedExpense.category, currency, share);
     }
@@ -248,7 +234,6 @@ export async function getMonthlyTimeline(
       year: m.year,
       month: m.month,
       myTotals,
-      coupleTotals,
       breakdown: {
         purchases: breakdownPurchases,
         fixedExpenses: breakdownFixedExpenses,
