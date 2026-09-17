@@ -23,7 +23,10 @@ export function getSessionOptions(): SessionOptions {
     cookieOptions: {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      // Cookie "Secure" e ignorado pelo navegador fora de HTTPS. Deploy
+      // atual roda sem TLS/dominio ainda - COOKIE_SECURE=false permite isso
+      // sem perder o default seguro assim que houver TLS na frente.
+      secure: process.env.COOKIE_SECURE === "false" ? false : process.env.NODE_ENV === "production",
     },
   };
 }
